@@ -7,3 +7,5 @@ In this project, I create 2 LSTM networks: A generative network and a descrimina
 This is similar to the generative adversarial network (GAN) developed by Goodfellow et al, 2014.
 
 The generative model is written in generator.py. The descriminative model will be written in descriminator.py.
+
+So far, this program only uses numpy, not theano or tensorflow.
