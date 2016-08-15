@@ -1,0 +1,5 @@
+TODO
+
+Make a way for outputs from the LSTM to go back and become inputs
+Calculate gradient of LSTM with BPTT
+Move LSTM code into a file LSTM.py and have generator-specific things in generator.py
