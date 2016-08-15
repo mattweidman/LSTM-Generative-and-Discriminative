@@ -14,8 +14,6 @@ class LSTM_layer:
         # initialize all parameters
         self.input_size = input_size
         self.output_size = output_size
-        #self.x0 = np.zeros((input_size)) # for the first layer, x is 0
-                                    # may change this when I make more layers
         self.s0 = random_matrix(1, output_size)
         self.h0 = random_matrix(1, output_size)
         self.Wgx = random_matrix(output_size, input_size)
@@ -44,21 +42,6 @@ class LSTM_layer:
         s = g*i + s_prev.T*f
         h = phi(s)*o
         return s.T, h.T
-
-    # using the parameters, calculates a sequence of characters
-    # of length sequence_length
-    # returns a matrix of size output_size x sequence_length
-    # assumes x is 0 every time step because you need other layers to
-    # tell you what x is going to be
-    '''def forward_prop_sequence(self, sequence_length):
-        x = self.x0.copy()
-        s = self.s0.copy()
-        h = self.h0.copy()
-        outp = np.zeros((self.output_size, 1))
-        for j in range(sequence_length):
-            s, h = self.forward_prop_once(x, s, h)
-            outp = np.hstack((outp, h[:, np.newaxis]))
-        return outp[:, 1:]'''
 
 class LSTM:
 
