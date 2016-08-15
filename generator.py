@@ -69,10 +69,10 @@ class LSTM:
 
     # using a sequence of inputs, creates a sequence of outputs
     # X is a tensor of size (num_examples, sequence_length, input_size)
-    # the output is a matrix Y which is size (num_examples, sequence_length,
+    # the output is a tensor Y which is size (num_examples, sequence_length,
     # output_size)
     # there is exactly one output for every input
-    def forward_prop_sequence(self, X):
+    def forward_prop_one2one(self, X):
         num_examples = X.shape[0]
         s = [layer.s0.repeat(num_examples, axis=0) for layer in self.layers]
         h = [layer.h0.repeat(num_examples, axis=0) for layer in self.layers]
@@ -80,6 +80,23 @@ class LSTM:
         for x in X.swapaxes(0,1):
             s, h = self.forward_prop_once(x, s, h)
             outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
+        return outp
+
+    # using a single input, generate a sequence of outputs
+    # x is a matrix of size (num_examples, input_size)
+    # the output Y is size (num_examples, sequence_length, output_size)
+    # the output at each timestep is calculated by using the previous output
+    # as input
+    # input_size and output_size must therefore be the same
+    def forward_prop_feedback(self, x, sequence_length):
+        num_examples = x.shape[0]
+        s = [layer.s0.repeat(num_examples, axis=0) for layer in self.layers]
+        h = [layer.h0.repeat(num_examples, axis=0) for layer in self.layers]
+        outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
+        for i in range(sequence_length):
+            s, h = self.forward_prop_once(x, s, h)
+            outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
+            x = h[-1]
         return outp
 
 list_of_chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
@@ -99,19 +116,21 @@ def matrix_to_string(mat):
 
 if __name__ == "__main__":
     # construct the LSTM
-    input_size = 40
+    input_size = num_chars
     hidden_size = 30
+    output_size = num_chars
     network = LSTM()
     network.add_layer(LSTM_layer(input_size, hidden_size))
-    network.add_layer(LSTM_layer(hidden_size, num_chars))
+    network.add_layer(LSTM_layer(hidden_size, output_size))
 
     # construct the input
-    seq_length = 150
+    seq_length = 50
     num_examples = 10
-    X = np.random.randn(num_examples, seq_length, input_size)
+    X_once = np.random.randn(num_examples, input_size)
+    X_sequence = np.random.randn(num_examples, seq_length, input_size)
 
     # use the LSTM
-    sequence_tensor = network.forward_prop_sequence(X)
+    sequence_tensor = network.forward_prop_feedback(X_once, seq_length)
     for matx in sequence_tensor:
         outp = matrix_to_string(matx)
         print(outp)
