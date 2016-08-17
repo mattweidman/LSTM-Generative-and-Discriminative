@@ -17,26 +17,29 @@ def matrix_to_string(mat):
         output_str += c
     return output_str
 
+def softmax(x):
+    denominator = np.sum(np.exp(x))
+    return np.exp(x)/denominator
+
 if __name__ == "__main__":
     # backprop for one layer
     input_size = 20
     output_size = 5
-    num_examples = 10
+    num_examples = 1000
 
     x = np.random.randn(num_examples, input_size)
-    s0 = np.random.randn(num_examples, output_size)
-    h0 = np.random.randn(num_examples, output_size)
-    s2_grad = np.zeros((num_examples, output_size))
-    h2_grad = np.zeros((num_examples, output_size))
     layer = LSTM_layer(input_size, output_size)
 
     y = np.array([[0, 1, 0, 0, 0]])
+    def loss(h):
+        n_ex = h.shape[0]
+        return 1/(2*n_ex) * np.sum((y-h)**2)
     def dloss(h):
         n_ex = h.shape[0]
-        return 1/n_ex * (h-y)
+        return 1/n_ex * (y-h)
 
-    layer_grad = layer.backprop(x, s0, h0, dloss, s2_grad, h2_grad)
-    dLdtheta, dLdx, dLds_prev, dLdh_prev = layer_grad
+    layer_grad = layer.backprop(x, dloss)
+    dLdtheta, dLdx, dLds_prev, dLdh_prev = layer_grad.to_tuple()
 
     def assert_same_shape(a1, a2):
         assert len(a1.shape) == len(a2.shape)
@@ -44,10 +47,20 @@ if __name__ == "__main__":
             assert a1.shape[i] == a2.shape[i]
 
     assert_same_shape(x, dLdx)
-    assert_same_shape(s0, dLds_prev)
-    assert_same_shape(h0, dLdh_prev)
+    assert_same_shape(layer.s0, dLds_prev)
+    assert_same_shape(layer.h0, dLdh_prev)
     for i in range(len(dLdtheta)):
         assert_same_shape(layer.theta[i], dLdtheta[i])
+
+    num_epochs = 10000
+    learning_rate = 0.1
+    for i in range(num_epochs):
+        grad = layer.backprop(x, dloss)
+        layer.update_theta(grad, learning_rate)
+        outp = layer.forward_prop_once(x)
+        print(loss(outp[1]))
+    outp = layer.forward_prop_once(np.zeros((1, input_size)))
+    print(softmax(outp[1]))
 
     '''# construct the LSTM
     input_size = num_chars

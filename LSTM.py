@@ -38,8 +38,13 @@ class LSTM_layer:
     # x: input matrix, size (num_examples, input_size)
     # s_prev: previous internal state size (num_examples, output_size)
     # h_prev: previous output from this hidden layer, same size as s_prev
+    # if s_prev or h_prev is None, this function will use self.s0 and self.h0
     # returns (internal state, hidden layer) tuple
-    def forward_prop_once(self, x, s_prev, h_prev):
+    def forward_prop_once(self, x, s_prev=None, h_prev=None):
+        if s_prev is None:
+            s_prev = self.s0
+        if h_prev is None:
+            h_prev = self.h0
         g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
         i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
         f = sigmoid(self.Wfx.dot(x.T) + self.Wfh.dot(h_prev.T) + self.bf)
@@ -53,11 +58,35 @@ class LSTM_layer:
     # dloss is a function to compute the derivative of the loss with respect
     # to the output vector h. It should only be a function of h.
     # s_next_grad and h_next_grad are the gradients of s(t+1) and h(t+1)
+    # default values for next_grad vectors are zero-vectors
     # returns tuple containing gradients of parameters theta, x, s_prev, and
     # h_prev, in that order
     # note that for all matrix arguments to this function, num_examples is
     # the size of the first dimension
-    def backprop(self, x, s_prev, h_prev, dloss, s_next_grad, h_next_grad):
+    def backprop(self, x, dloss, s_prev=None, h_prev=None,
+            s_next_grad=None, h_next_grad=None):
+
+        # default values for s_prev and h_prev
+        if s_prev is None:
+            s_prev = self.s0
+        if h_prev is None:
+            h_prev = self.h0
+
+        # if s_prev or h_prev only has one row, repeat that row so that
+        # there is one row for each example in x
+        s_prev_first_dim = s_prev.shape[0]
+        if s_prev_first_dim == 1:
+            s_prev = s_prev.repeat(x.shape[0], axis=0)
+        h_prev_first_dim = h_prev.shape[0]
+        if h_prev_first_dim == 1:
+            h_prev = h_prev.repeat(x.shape[0], axis=0)
+
+        # default values for s_next_grad and h_next_grad
+        if s_next_grad is None:
+            s_next_grad = np.zeros(s_prev.shape)
+        if h_next_grad is None:
+            h_next_grad = np.zeros(h_prev.shape)
+
         # propagate forward
         g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
         i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
@@ -105,10 +134,47 @@ class LSTM_layer:
             dLdWoh, dLdbg, dLdbi, dLdbf, dLdbo]
         dLdx = dLdxg + dLdxi + dLdxf + dLdxo
         dLdh_prev = dLdhg + dLdhi + dLdhf + dLdho
-        return dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T
+
+        # make sure the number of dimensions of dLds_prev and dLdh_prev are
+        # the same as s_prev and h_prev
+        if s_prev_first_dim == 1:
+            dLds_prev = dLds_prev.sum(axis=1)[:,np.newaxis]
+        if h_prev_first_dim == 1:
+            dLdh_prev = dLdh_prev.sum(axis=1)[:,np.newaxis]
+        
+        return LSTM_layer_gradient(dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T)
+
+    # update the parameters of this LSTM layer by SGD
+    # parameters <- parameters - gradient * learning rate
+    # gradient: LSTM_layer_gradient object
+    def update_theta(self, gradient, learning_rate):
+        for param, grad in zip(self.theta, gradient.dLdtheta):
+            param -= learning_rate * grad
+
+    # update the parameters of this LSTM layer by SGD, including initial
+    # s and h vectors
+    # parameters <- parameters - gradient * learning rate
+    # gradient: LSTM_layer_gradient object
+    def update_theta_s0_h0(self, gradient, learning_rate):
+        self.update_theta(gradient, learning_rate)
+        self.s0 -= learning_rate * gradient.dLds_prev
+        self.h0 -= learning_rate * gradient.dLdh_prev
+
+class LSTM_layer_gradient():
+    # dLdtheta: list of gradients with respect to LSTM_layer parameters
+    # dLdx: gradient with prespect to x(t)
+    # dLds_prev: gradient with respect to s(t-1)
+    # dLdh_prev: gradient with respect to h(t-1)
+    def __init__(self, dLdtheta, dLdx, dLds_prev, dLdh_prev):
+        self.dLdtheta = dLdtheta
+        self.dLdx = dLdx
+        self.dLds_prev = dLds_prev
+        self.dLdh_prev = dLdh_prev
+
+    def to_tuple(self):
+        return self.dLdtheta, self.dLdx, self.dLds_prev, self.dLdh_prev
 
 class LSTM:
-
     def __init__(self):
         self.layers = []
 

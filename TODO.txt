@@ -1,6 +1,11 @@
 TODO
 
 Add a softmax layer for the output of the LSTM
+
+Test training on one-layer, one-character inputs
+Check everything and make sure backprop is working properly
+Especially check how s0 and h0 are updated, since update_theta_s0_h0 almost always approaches a local optimum where cost=0.5
+
 Find gradient of LSTM on single elements
 Perform BPTT on LSTM for sequences
 Train LSTM by SGD
