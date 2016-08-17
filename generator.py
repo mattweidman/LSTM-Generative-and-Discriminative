@@ -19,7 +19,7 @@ def matrix_to_string(mat):
     return output_str
 
 def softmax(x):
-    denominator = np.sum(np.exp(x))
+    denominator = np.sum(np.exp(x), axis=1)[:,np.newaxis]
     return np.exp(x)/denominator
 
 if __name__ == "__main__":
@@ -62,8 +62,9 @@ if __name__ == "__main__":
         layer.update_theta_s0_h0(grad, learning_rate)
         outp = layer.forward_prop_once(x)
         print(loss(outp[1]))
-    outp = layer.forward_prop_once(np.array([[0, 0, 1, 0, 0]]))
-    print(softmax(outp[1]))
+    outp = layer.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]))
+    print(outp[1])
 
     '''# construct the LSTM
     input_size = num_chars
