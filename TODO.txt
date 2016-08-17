@@ -1,4 +1,7 @@
 TODO
 
-Calculate gradient of LSTM with BPTT
-Move LSTM code into a file LSTM.py and have generator-specific things in generator.py
+Add a softmax layer for the output of the LSTM
+Find gradient of LSTM on single elements
+Perform BPTT on LSTM for sequences
+Train LSTM by SGD
+Adagrad, Adadelta, RMSprop, Conjugate gradient descent?

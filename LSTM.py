@@ -3,9 +3,11 @@ import numpy as np
 def random_matrix(height, width):
     return np.random.randn(height, width)
 
+# note to self: if I change this, I have to change backprop() as well
 def phi(x):
     return np.tanh(x)
 
+# note to self: if I change this, I have to change backprop() as well
 def sigmoid(x):
     return 1/(1+np.exp(x))
 
@@ -28,6 +30,9 @@ class LSTM_layer:
         self.bi = random_matrix(output_size, 1)
         self.bf = random_matrix(output_size, 1)
         self.bo = random_matrix(output_size, 1)
+        self.theta = [self.Wgx, self.Wix, self.Wfx, self.Wox,
+            self.Wgh, self.Wih, self.Wfh, self.Woh,
+            self.bg, self.bi, self.bf, self.bo]
 
     # calculate the state and hidden layer vectors for the next time step
     # x: input matrix, size (num_examples, input_size)
@@ -42,6 +47,63 @@ class LSTM_layer:
         s = g*i + s_prev.T*f
         h = phi(s)*o
         return s.T, h.T
+
+    # finds the gradient of this LSTM layer by propagating forward and back
+    # x, s_prev, and h_prev are as described in forward_prop_once
+    # dloss is a function to compute the derivative of the loss with respect
+    # to the output vector h. It should only be a function of h.
+    # s_next_grad and h_next_grad are the gradients of s(t+1) and h(t+1)
+    # returns tuple containing gradients of parameters theta, x, s_prev, and
+    # h_prev, in that order
+    def backprop(self, x, s_prev, h_prev, dloss, s_next_grad, h_next_grad):
+        # propagate forward
+        g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
+        i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
+        f = sigmoid(self.Wfx.dot(x.T) + self.Wfh.dot(h_prev.T) + self.bf)
+        o = sigmoid(self.Wox.dot(x.T) + self.Woh.dot(h_prev.T) + self.bo)
+        s = g*i + s_prev.T*f
+        h = phi(s)*o
+
+        # backprop to each gate
+        dLdh = dloss(h.T).T + h_next_grad.T
+        dLdo = dLdh * phi(s)
+        dLds = dLdh * o * (1-phi(s)**2) + s_next_grad.T
+        dLdg = dLds * i
+        dLdi = dLds * g
+        dLdf = dLds * s_prev.T
+        dLds_prev = dLds * f
+
+        # finds dL/dW?x, dL/dW?h, dL/db?, dL/dx_?, and dL/dh_?
+        # grad_in is equal to dL/d? * sigmoid_prime or dL/d? * phi_prime
+        # ? indicates the name of a gate - g, i, f, or o
+        def backprop_gate(grad_in, W_x, W_h):
+            dLdW_x = grad_in.dot(x)
+            dLdW_h = grad_in.dot(h_prev)
+            dLdb_ = grad_in.sum(axis=1)
+            dLdx_ = W_x.T.dot(grad_in)
+            dLdh_ = W_h.T.dot(grad_in)
+            return dLdW_x, dLdW_h, dLdb_, dLdx_, dLdh_
+
+        # backprop within each gate
+        g_prime = dLdg * (1-g**2)
+        dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg = backprop_gate(g_prime, self.Wgx,
+            self.Wgh)
+        i_prime = dLdi * i*(1-i)
+        dLdWix, dLdWih, dLdbi, dLdxi, dLdhi = backprop_gate(i_prime, self.Wix,
+            self.Wih)
+        f_prime = dLdf * f*(1-f)
+        dLdWfx, dLdWfh, dLdbf, dLdxf, dLdhf = backprop_gate(f_prime, self.Wfx,
+            self.Wfh)
+        o_prime = dLdo * o*(1-o)
+        dLdWox, dLdWoh, dLdbo, dLdxo, dLdho = backprop_gate(o_prime, self.Wox,
+            self.Woh)
+
+        # combine everything into one data structure
+        dLdtheta = [dLdWgx, dLdWix, dLdWfx, dLdWox, dLdWgh, dLdWih, dLdWfh,
+            dLdWoh, dLdbg, dLdbi, dLdbf, dLdbo]
+        dLdx = dLdxg + dLdxi + dLdxf + dLdxo
+        dLdh_prev = dLdhg + dLdhi + dLdhf + dLdho
+        return dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T
 
 class LSTM:
 
