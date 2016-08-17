@@ -55,6 +55,8 @@ class LSTM_layer:
     # s_next_grad and h_next_grad are the gradients of s(t+1) and h(t+1)
     # returns tuple containing gradients of parameters theta, x, s_prev, and
     # h_prev, in that order
+    # note that for all matrix arguments to this function, num_examples is
+    # the size of the first dimension
     def backprop(self, x, s_prev, h_prev, dloss, s_next_grad, h_next_grad):
         # propagate forward
         g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
@@ -79,7 +81,7 @@ class LSTM_layer:
         def backprop_gate(grad_in, W_x, W_h):
             dLdW_x = grad_in.dot(x)
             dLdW_h = grad_in.dot(h_prev)
-            dLdb_ = grad_in.sum(axis=1)
+            dLdb_ = grad_in.sum(axis=1)[:,np.newaxis]
             dLdx_ = W_x.T.dot(grad_in)
             dLdh_ = W_h.T.dot(grad_in)
             return dLdW_x, dLdW_h, dLdb_, dLdx_, dLdh_

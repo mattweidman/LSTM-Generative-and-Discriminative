@@ -22,18 +22,32 @@ if __name__ == "__main__":
     input_size = 20
     output_size = 5
     num_examples = 10
+
     x = np.random.randn(num_examples, input_size)
     s0 = np.random.randn(num_examples, output_size)
     h0 = np.random.randn(num_examples, output_size)
     s2_grad = np.zeros((num_examples, output_size))
     h2_grad = np.zeros((num_examples, output_size))
     layer = LSTM_layer(input_size, output_size)
+
     y = np.array([[0, 1, 0, 0, 0]])
     def dloss(h):
         n_ex = h.shape[0]
         return 1/n_ex * (h-y)
+
     layer_grad = layer.backprop(x, s0, h0, dloss, s2_grad, h2_grad)
-    print(layer_grad)
+    dLdtheta, dLdx, dLds_prev, dLdh_prev = layer_grad
+
+    def assert_same_shape(a1, a2):
+        assert len(a1.shape) == len(a2.shape)
+        for i in range(len(a1.shape)):
+            assert a1.shape[i] == a2.shape[i]
+
+    assert_same_shape(x, dLdx)
+    assert_same_shape(s0, dLds_prev)
+    assert_same_shape(h0, dLdh_prev)
+    for i in range(len(dLdtheta)):
+        assert_same_shape(layer.theta[i], dLdtheta[i])
 
     '''# construct the LSTM
     input_size = num_chars
