@@ -9,7 +9,7 @@ def phi(x):
 
 # note to self: if I change this, I have to change backprop() as well
 def sigmoid(x):
-    return 1/(1+np.exp(x))
+    return 1/(1+np.exp(-x))
 
 class LSTM_layer:
     def __init__(self, input_size, output_size):
@@ -141,7 +141,7 @@ class LSTM_layer:
             dLds_prev = dLds_prev.sum(axis=1)[:,np.newaxis]
         if h_prev_first_dim == 1:
             dLdh_prev = dLdh_prev.sum(axis=1)[:,np.newaxis]
-        
+
         return LSTM_layer_gradient(dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T)
 
     # update the parameters of this LSTM layer by SGD

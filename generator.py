@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from LSTM import LSTM_layer, LSTM
 
@@ -23,20 +24,22 @@ def softmax(x):
 
 if __name__ == "__main__":
     # backprop for one layer
-    input_size = 20
-    output_size = 5
+    input_size = 5
+    output_size = input_size
     num_examples = 1000
 
-    x = np.random.randn(num_examples, input_size)
+    x = np.zeros((num_examples, input_size))
+    for row in x:
+        randind = random.randint(0, input_size-1)
+        row[randind] = 1
     layer = LSTM_layer(input_size, output_size)
 
-    y = np.array([[0, 1, 0, 0, 0]])
     def loss(h):
         n_ex = h.shape[0]
-        return 1/(2*n_ex) * np.sum((y-h)**2)
+        return 1/(2*n_ex) * np.sum((x-h)**2)
     def dloss(h):
         n_ex = h.shape[0]
-        return 1/n_ex * (y-h)
+        return 1/n_ex * (h-x)
 
     layer_grad = layer.backprop(x, dloss)
     dLdtheta, dLdx, dLds_prev, dLdh_prev = layer_grad.to_tuple()
@@ -53,13 +56,13 @@ if __name__ == "__main__":
         assert_same_shape(layer.theta[i], dLdtheta[i])
 
     num_epochs = 10000
-    learning_rate = 0.1
+    learning_rate = .1
     for i in range(num_epochs):
         grad = layer.backprop(x, dloss)
-        layer.update_theta(grad, learning_rate)
+        layer.update_theta_s0_h0(grad, learning_rate)
         outp = layer.forward_prop_once(x)
         print(loss(outp[1]))
-    outp = layer.forward_prop_once(np.zeros((1, input_size)))
+    outp = layer.forward_prop_once(np.array([[0, 0, 1, 0, 0]]))
     print(softmax(outp[1]))
 
     '''# construct the LSTM
