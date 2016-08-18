@@ -9,7 +9,7 @@ num_chars = len(list_of_chars)
 char_dict = dict((c,i) for i,c in enumerate(list_of_chars))
 
 def vector_to_char(vector):
-    index = np.argmin(vector)
+    index = np.argmax(vector)
     return list_of_chars[index]
 
 # matrix size: (seq_length, num_chars)
@@ -19,6 +19,14 @@ def matrix_to_string(mat):
         c = vector_to_char(v)
         output_str += c
     return output_str
+
+# tensor size: (num_examples, seq_length, num_chars)
+def tensor_to_strings(tensor):
+    ans = ""
+    for matx in tensor:
+        outp = matrix_to_string(matx)
+        ans += outp + "\n"
+    return ans
 
 def char_to_vec(c):
     ans = np.zeros((num_chars))
@@ -40,7 +48,7 @@ if __name__ == "__main__":
     network.add_layer(LSTM_layer(hidden_size, output_size))
 
     # construct the input
-    seq_length = 20
+    seq_length = 3
     num_examples = 100
     X_once = np.random.randn(num_examples, input_size)
     X_sequence = np.zeros((num_examples, seq_length, input_size))
@@ -70,11 +78,9 @@ if __name__ == "__main__":
     def char_to_matx(c, length=seq_length):
         return [char_to_vec(c)] * length
     inp = np.array([char_to_matx('a'), char_to_matx('b'), char_to_matx('c')])
-    print(inp.shape)
+    print(tensor_to_strings(inp))
     sequence_tensor = network.forward_prop_one2one(inp)
-    for matx in sequence_tensor:
-        outp = matrix_to_string(matx)
-        print("\"" + str(outp) + "\"")
+    print(tensor_to_strings(sequence_tensor))
 
     '''# backprop for multiple layers
     input_size = 5
