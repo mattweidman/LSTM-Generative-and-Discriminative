@@ -1,7 +1,8 @@
+import math
 import numpy as np
 
 def random_matrix(height, width):
-    return np.random.randn(height, width)
+    return np.random.randn(height, width) / math.sqrt(width)
 
 # note to self: if I change this, I have to change backprop() as well
 def phi(x):
@@ -141,6 +142,9 @@ class LSTM_layer_gradient():
         return LSTM_layer_gradient(self.dLdtheta+other.dLdtheta,
             self.dLdx+other.dLdx, self.dLds_prev+other.dLds_prev,
             self.dLdh_prev+other.dLdh_prev)
+
+    def magnitude_theta(self):
+        return sum([np.sum(p**2) for p in self.dLdtheta])
 
 class LSTM:
     def __init__(self):

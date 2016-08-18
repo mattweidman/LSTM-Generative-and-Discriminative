@@ -79,7 +79,8 @@ if __name__ == "__main__":
         network.update_theta(grad, learning_rate)
         outp = network.forward_prop_one2one(X_sequence)
         total_loss = loss(outp, X_sequence)
-        print(total_loss)
+        magnitude = sum([gl.magnitude_theta() for gl in grad])
+        print("cost:%f\tgradient:%f" % (total_loss, magnitude))
 
     # use the LSTM
     def char_to_matx(c, length=seq_length):
