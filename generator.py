@@ -57,6 +57,8 @@ if __name__ == "__main__":
             for j in range(seq_length):
                 X_sequence[i,j,randind] = 1
         return X_sequence
+    def normalize(v):
+        return (v-v.mean())/v.std()
 
     # loss function and its gradient
     def get_n(h_):
@@ -70,14 +72,14 @@ if __name__ == "__main__":
         return 1/get_n(h_) * (h_-x_)
 
     # train
-    num_epochs = 1000
+    num_epochs = 100
     learning_rate = 10
     for i in range(num_epochs):
         X_sequence = gen_x_sequence()
         dloss_i = lambda h_, i_: dloss(h_, X_sequence[:,i_,:])
-        grad = network.BPTT_one2one(X_sequence, dloss_i)
+        grad = network.BPTT_one2one(normalize(X_sequence), dloss_i)
         network.update_theta(grad, learning_rate)
-        outp = network.forward_prop_one2one(X_sequence)
+        outp = network.forward_prop_one2one(normalize(X_sequence))
         total_loss = loss(outp, X_sequence)
         magnitude = sum([gl.magnitude_theta() for gl in grad])
         print("cost:%f\tgradient:%f" % (total_loss, magnitude))
@@ -87,7 +89,7 @@ if __name__ == "__main__":
         return [char_to_vec(c)] * length
     inp = np.array([char_to_matx(chr(c)) for c in range(97, 123)])
     print(inp.shape)
-    outp = network.forward_prop_one2one(inp)
+    outp = network.forward_prop_one2one(normalize(inp))
     for i in range(inp.shape[0]):
         print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
 
