@@ -16,8 +16,6 @@ class LSTM_layer:
         # initialize all parameters
         self.input_size = input_size
         self.output_size = output_size
-        self.s0 = random_matrix(1, output_size)
-        self.h0 = random_matrix(1, output_size)
         self.Wgx = random_matrix(output_size, input_size)
         self.Wix = random_matrix(output_size, input_size)
         self.Wfx = random_matrix(output_size, input_size)
@@ -38,14 +36,11 @@ class LSTM_layer:
     # x: input matrix, size (num_examples, input_size)
     # s_prev: previous internal state size (num_examples, output_size)
     # h_prev: previous output from this hidden layer, same size as s_prev
-    # if s_prev or h_prev is None, this function will use self.s0 and self.h0
     # returns (internal state, hidden layer) tuple
-    def forward_prop_once(self, x, s_prev=None, h_prev=None):
-        if s_prev is None:
-            s_prev = self.s0
-        if h_prev is None:
-            h_prev = self.h0
-        g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
+    def forward_prop_once(self, x, s_prev, h_prev):
+        g = phi(self.Wgx.dot(x.T) +
+            self.Wgh.dot(h_prev.T) +
+            self.bg)
         i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
         f = sigmoid(self.Wfx.dot(x.T) + self.Wfh.dot(h_prev.T) + self.bf)
         o = sigmoid(self.Wox.dot(x.T) + self.Woh.dot(h_prev.T) + self.bo)
@@ -62,23 +57,8 @@ class LSTM_layer:
     # returns an LSTM_layer_gradient object
     # note that for all matrix arguments to this function, num_examples is
     # the size of the first dimension
-    def backprop(self, x, dloss, s_prev=None, h_prev=None,
-            s_next_grad=None, h_next_grad=None):
-
-        # default values for s_prev and h_prev
-        if s_prev is None:
-            s_prev = self.s0
-        if h_prev is None:
-            h_prev = self.h0
-
-        # if s_prev or h_prev only has one row, repeat that row so that
-        # there is one row for each example in x
-        s_prev_first_dim = s_prev.shape[0]
-        if s_prev_first_dim == 1:
-            s_prev = s_prev.repeat(x.shape[0], axis=0)
-        h_prev_first_dim = h_prev.shape[0]
-        if h_prev_first_dim == 1:
-            h_prev = h_prev.repeat(x.shape[0], axis=0)
+    def backprop(self, x, dloss, s_prev, h_prev, s_next_grad=None,
+            h_next_grad=None):
 
         # default values for s_next_grad and h_next_grad
         if s_next_grad is None:
@@ -134,13 +114,6 @@ class LSTM_layer:
         dLdx = dLdxg + dLdxi + dLdxf + dLdxo
         dLdh_prev = dLdhg + dLdhi + dLdhf + dLdho
 
-        # make sure the number of dimensions of dLds_prev and dLdh_prev are
-        # the same as s_prev and h_prev
-        if s_prev_first_dim == 1:
-            dLds_prev = dLds_prev.sum(axis=1)[:,np.newaxis]
-        if h_prev_first_dim == 1:
-            dLdh_prev = dLdh_prev.sum(axis=1)[:,np.newaxis]
-
         return LSTM_layer_gradient(dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T)
 
     # update the parameters of this LSTM layer by SGD
@@ -149,15 +122,6 @@ class LSTM_layer:
     def update_theta(self, gradient, learning_rate):
         for param, grad in zip(self.theta, gradient.dLdtheta):
             param -= learning_rate * grad
-
-    # update the parameters of this LSTM layer by SGD, including initial
-    # s and h vectors
-    # parameters <- parameters - gradient * learning rate
-    # gradient: LSTM_layer_gradient object
-    def update_theta_s0_h0(self, gradient, learning_rate):
-        self.update_theta(gradient, learning_rate)
-        self.s0 -= learning_rate * gradient.dLds_prev
-        self.h0 -= learning_rate * gradient.dLdh_prev
 
 class LSTM_layer_gradient():
     # dLdtheta: list of gradients with respect to LSTM_layer parameters
@@ -186,11 +150,7 @@ class LSTM:
     # elements of s_prev and h_prev are size (num_examples, layer_output_size)
     # returns (internal state, hidden layer) tuple (which are same
     # dimensions as s_prev and h_prev)
-    def forward_prop_once(self, x, s_prev=None, h_prev=None):
-        if s_prev is None:
-            s_prev = self.expand_vec(lambda l: l.s0, x.shape[0])
-        if h_prev is None:
-            h_prev = self.expand_vec(lambda l: l.h0, x.shape[0])
+    def forward_prop_once(self, x, s_prev, h_prev):
         s = []
         h = []
         for i in range(len(self.layers)):
@@ -205,10 +165,14 @@ class LSTM:
     # the output is a tensor Y which is size (num_examples, sequence_length,
     # output_size)
     # there is exactly one output for every input
-    def forward_prop_one2one(self, X):
+    def forward_prop_one2one(self, X, s0=None, h0=None):
         num_examples = X.shape[0]
-        s = [layer.s0.repeat(num_examples, axis=0) for layer in self.layers]
-        h = [layer.h0.repeat(num_examples, axis=0) for layer in self.layers]
+        if s0 is None:
+            s0 = [np.zeros((num_examples, l.output_size)) for l in self.layers]
+        s = s0
+        if h0 is None:
+            h0 = [np.zeros((num_examples, l.output_size)) for l in self.layers]
+        h = h0
         outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
         for x in X.swapaxes(0,1):
             s, h = self.forward_prop_once(x, s, h)
@@ -221,21 +185,20 @@ class LSTM:
     # the output at each timestep is calculated by using the previous output
     # as input
     # input_size and output_size must therefore be the same
-    def forward_prop_feedback(self, x, sequence_length):
+    def forward_prop_feedback(self, x, sequence_length, s0=None, h0=None):
         num_examples = x.shape[0]
-        s = [layer.s0.repeat(num_examples, axis=0) for layer in self.layers]
-        h = [layer.h0.repeat(num_examples, axis=0) for layer in self.layers]
+        if s0 is None:
+            s0 = [np.zeros((num_examples, l.output_size)) for l in self.layers]
+        s = s0
+        if h0 is None:
+            h0 = [np.zeros((num_examples, l.output_size)) for l in self.layers]
+        h = h0
         outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
         for i in range(sequence_length):
             s, h = self.forward_prop_once(x, s, h)
             outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
             x = h[-1]
         return outp
-
-    # v is a function that chooses a vector, given a layer
-    # example: v = lambda layer: layer.s0
-    def expand_vec(self, v, num_examples):
-        return [v(layer).repeat(num_examples, axis=0) for layer in self.layers]
 
     # perform backpropagation on one element in the sequence
     # x is the input, size (num_examples, input_size)
@@ -246,44 +209,17 @@ class LSTM:
     # s_next_grad is a list of s(t+1) gradients for each layer
     # h_next_grad is a list of h(t+1) gradients for each layer
     # returns a list of LSTM_layer_gradient objects
-    def backprop_once(self, x, dloss, s_prev=None, h_prev=None,
-            s_next_grad=None, h_next_grad=None):
-        # default values for s_prev and h_prev
-        num_examples = x.shape[0]
-        s_prev_is_none = False
-        if s_prev is None:
-            s_prev = self.expand_vec(lambda l: l.s0, num_examples)
-            s_prev_is_none = True
-        h_prev_is_none = False
-        if h_prev is None:
-            h_prev = self.expand_vec(lambda l: l.h0, num_examples)
-            h_prev_is_none = True
-
+    def backprop_once(self, x, dloss, s_prev, h_prev, s_next_grad=None,
+            h_next_grad=None):
+            
         # default values for s_next_grad and h_next_grad
-        s_next_is_none = False
         if s_next_grad is None:
-            s_next_grad = [np.zeros((num_examples, layer.output_size))
-                for layer in self.layers]
-            s_next_is_none = True
-        h_next_is_none = False
+            s_next_grad = [None] * len(self.layers)
         if h_next_grad is None:
-            h_next_grad = [np.zeros((num_examples, layer.output_size))
-                for layer in self.layers]
-            h_next_is_none = True
+            h_next_grad = [None] * len(self.layers)
 
         # forward propagate
         s, h = self.forward_prop_once(x, s_prev, h_prev)
-
-        # change s_prev, h_prev, s_next_grad, and h_next_grad so that backprop
-        # uses default values
-        if s_prev_is_none:
-            s_prev = [None] * len(self.layers)
-        if h_prev_is_none:
-            h_prev = [None] * len(self.layers)
-        if s_next_is_none:
-            s_next_grad = [None] * len(self.layers)
-        if h_next_is_none:
-            h_next_grad = [None] * len(self.layers)
 
         # backprop each layer
         gradient = []
