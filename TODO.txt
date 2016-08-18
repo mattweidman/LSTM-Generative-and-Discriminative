@@ -2,6 +2,7 @@ TODO
 
 Add a softmax layer for the output of the LSTM
 
+Make updating s0 and h0 work for multiple layer LSTM
 Make sure I'm adding s_next_grad and h_next_grad in the right places
 Perform BPTT on LSTM for sequences
 Train LSTM by SGD

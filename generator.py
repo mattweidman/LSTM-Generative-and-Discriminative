@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     # backprop for multiple layers
     input_size = 5
-    hidden_size = 3
+    hidden_size = 10
     output_size = 5
     num_examples = 1000
 
@@ -82,20 +82,19 @@ if __name__ == "__main__":
         for i in range(len(a1.shape)):
             assert a1.shape[i] == a2.shape[i]
 
-    lstm_grad = lstmnet.backprop_once(x, dloss, s_prev=s_prev, h_prev=h_prev,
-        s_next_grad=s_next_grad, h_next_grad=h_next_grad)
+    lstm_grad = lstmnet.backprop_once(x, dloss)
 
     grad1 = lstm_grad[0]
     assert_same_shape(x, grad1.dLdx)
-    assert_same_shape(s_prev[0], grad1.dLds_prev)
-    assert_same_shape(h_prev[0], grad1.dLdh_prev)
+    assert_same_shape(layer1.s0, grad1.dLds_prev)
+    assert_same_shape(layer1.h0, grad1.dLdh_prev)
     for th, dth in zip(layer1.theta, grad1.dLdtheta):
         assert_same_shape(th, dth)
 
     grad2 = lstm_grad[1]
     assert_same_shape(np.zeros((num_examples, hidden_size)), grad2.dLdx)
-    assert_same_shape(s_prev[1], grad2.dLds_prev)
-    assert_same_shape(h_prev[1], grad2.dLdh_prev)
+    assert_same_shape(layer2.s0, grad2.dLds_prev)
+    assert_same_shape(layer2.h0, grad2.dLdh_prev)
     for th, dth in zip(layer2.theta, grad2.dLdtheta):
         assert_same_shape(th, dth)
 
