@@ -44,16 +44,24 @@ if __name__ == "__main__":
         outp = matrix_to_string(matx)
         print(outp)'''
 
-    # backprop for one layer
-    input_size = 10
-    hidden_size = 5
-    output_size = 10
+    # backprop for multiple layers
+    input_size = 5
+    hidden_size = 3
+    output_size = 5
     num_examples = 1000
 
     x = np.zeros((num_examples, input_size))
     for row in x:
         randind = random.randint(0, input_size-1)
         row[randind] = 1
+    s_prev = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
+    h_prev = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
+    s_next_grad = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
+    h_next_grad = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
 
     layer1 = LSTM_layer(input_size, hidden_size)
     layer2 = LSTM_layer(hidden_size, output_size)
@@ -74,29 +82,31 @@ if __name__ == "__main__":
         for i in range(len(a1.shape)):
             assert a1.shape[i] == a2.shape[i]
 
-    lstm_grad = lstmnet.backprop_once(x, dloss)
+    lstm_grad = lstmnet.backprop_once(x, dloss, s_prev=s_prev, h_prev=h_prev,
+        s_next_grad=s_next_grad, h_next_grad=h_next_grad)
 
     grad1 = lstm_grad[0]
     assert_same_shape(x, grad1.dLdx)
-    assert_same_shape(layer1.s0, grad1.dLds_prev)
-    assert_same_shape(layer1.h0, grad1.dLdh_prev)
+    assert_same_shape(s_prev[0], grad1.dLds_prev)
+    assert_same_shape(h_prev[0], grad1.dLdh_prev)
     for th, dth in zip(layer1.theta, grad1.dLdtheta):
         assert_same_shape(th, dth)
 
     grad2 = lstm_grad[1]
     assert_same_shape(np.zeros((num_examples, hidden_size)), grad2.dLdx)
-    assert_same_shape(layer2.s0, grad2.dLds_prev)
-    assert_same_shape(layer2.h0, grad2.dLdh_prev)
+    assert_same_shape(s_prev[1], grad2.dLds_prev)
+    assert_same_shape(h_prev[1], grad2.dLdh_prev)
     for th, dth in zip(layer2.theta, grad2.dLdtheta):
         assert_same_shape(th, dth)
 
-    '''num_epochs = 10000
-    learning_rate = .1
+    num_epochs = 1000
+    learning_rate = 10
     for i in range(num_epochs):
-        grad = lstmnet.backprop_once(x, dloss)
-        #layer.update_theta_s0_h0(grad, learning_rate)
-        #outp = layer.forward_prop_once(x)
-        print(loss(outp[1]))
-    outp = layer.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
+        grad = lstmnet.backprop_once(x, dloss, s_prev=s_prev, h_prev=h_prev)
+        for layer, layer_grad in zip(lstmnet.layers, grad):
+            layer.update_theta(layer_grad, learning_rate)
+        outp = lstmnet.forward_prop_once(x)
+        print(loss(outp[1][-1]))
+    outp = lstmnet.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
         [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]))
-    print(outp[1])'''
+    print(outp[1][-1])

@@ -186,7 +186,11 @@ class LSTM:
     # elements of s_prev and h_prev are size (num_examples, layer_output_size)
     # returns (internal state, hidden layer) tuple (which are same
     # dimensions as s_prev and h_prev)
-    def forward_prop_once(self, x, s_prev, h_prev):
+    def forward_prop_once(self, x, s_prev=None, h_prev=None):
+        if s_prev is None:
+            s_prev = self.expand_vec(lambda l: l.s0, x.shape[0])
+        if h_prev is None:
+            h_prev = self.expand_vec(lambda l: l.h0, x.shape[0])
         s = []
         h = []
         for i in range(len(self.layers)):
@@ -228,6 +232,11 @@ class LSTM:
             x = h[-1]
         return outp
 
+    # v is a function that chooses a vector, given a layer
+    # example: v = lambda layer: layer.s0
+    def expand_vec(self, v, num_examples):
+        return [v(layer).repeat(num_examples, axis=0) for layer in self.layers]
+
     # perform backpropagation on one element in the sequence
     # x is the input, size (num_examples, input_size)
     # dloss is a function that computes the gradient of the loss function,
@@ -243,13 +252,11 @@ class LSTM:
         num_examples = x.shape[0]
         s_prev_is_none = False
         if s_prev is None:
-            s_prev = [layer.s0.repeat(num_examples, axis=0) for layer in
-                self.layers]
+            s_prev = self.expand_vec(lambda l: l.s0, num_examples)
             s_prev_is_none = True
         h_prev_is_none = False
         if h_prev is None:
-            h_prev = [layer.h0.repeat(num_examples, axis=0) for layer in
-                self.layers]
+            h_prev = self.expand_vec(lambda l: l.h0, num_examples)
             h_prev_is_none = True
 
         # default values for s_next_grad and h_next_grad
