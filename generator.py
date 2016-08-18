@@ -23,48 +23,6 @@ def softmax(x):
     return np.exp(x)/denominator
 
 if __name__ == "__main__":
-    # backprop for one layer
-    input_size = 5
-    output_size = input_size
-    num_examples = 1000
-
-    x = np.zeros((num_examples, input_size))
-    for row in x:
-        randind = random.randint(0, input_size-1)
-        row[randind] = 1
-    layer = LSTM_layer(input_size, output_size)
-
-    def loss(h):
-        n_ex = h.shape[0]
-        return 1/(2*n_ex) * np.sum((x-h)**2)
-    def dloss(h):
-        n_ex = h.shape[0]
-        return 1/n_ex * (h-x)
-
-    layer_grad = layer.backprop(x, dloss)
-    dLdtheta, dLdx, dLds_prev, dLdh_prev = layer_grad.to_tuple()
-
-    def assert_same_shape(a1, a2):
-        assert len(a1.shape) == len(a2.shape)
-        for i in range(len(a1.shape)):
-            assert a1.shape[i] == a2.shape[i]
-
-    assert_same_shape(x, dLdx)
-    assert_same_shape(layer.s0, dLds_prev)
-    assert_same_shape(layer.h0, dLdh_prev)
-    for i in range(len(dLdtheta)):
-        assert_same_shape(layer.theta[i], dLdtheta[i])
-
-    num_epochs = 10000
-    learning_rate = .1
-    for i in range(num_epochs):
-        grad = layer.backprop(x, dloss)
-        layer.update_theta_s0_h0(grad, learning_rate)
-        outp = layer.forward_prop_once(x)
-        print(loss(outp[1]))
-    outp = layer.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]))
-    print(outp[1])
 
     '''# construct the LSTM
     input_size = num_chars
@@ -85,3 +43,60 @@ if __name__ == "__main__":
     for matx in sequence_tensor:
         outp = matrix_to_string(matx)
         print(outp)'''
+
+    # backprop for one layer
+    input_size = 10
+    hidden_size = 5
+    output_size = 10
+    num_examples = 1000
+
+    x = np.zeros((num_examples, input_size))
+    for row in x:
+        randind = random.randint(0, input_size-1)
+        row[randind] = 1
+
+    layer1 = LSTM_layer(input_size, hidden_size)
+    layer2 = LSTM_layer(hidden_size, output_size)
+    lstmnet = LSTM()
+    lstmnet.add_layer(layer1)
+    lstmnet.add_layer(layer2)
+
+    def loss(h):
+        n_ex = h.shape[0]
+        return 1/(2*n_ex) * np.sum((x-h)**2)
+
+    def dloss(h):
+        n_ex = h.shape[0]
+        return 1/n_ex * (h-x)
+
+    def assert_same_shape(a1, a2):
+        assert len(a1.shape) == len(a2.shape)
+        for i in range(len(a1.shape)):
+            assert a1.shape[i] == a2.shape[i]
+
+    lstm_grad = lstmnet.backprop_once(x, dloss)
+
+    grad1 = lstm_grad[0]
+    assert_same_shape(x, grad1.dLdx)
+    assert_same_shape(layer1.s0, grad1.dLds_prev)
+    assert_same_shape(layer1.h0, grad1.dLdh_prev)
+    for th, dth in zip(layer1.theta, grad1.dLdtheta):
+        assert_same_shape(th, dth)
+
+    grad2 = lstm_grad[1]
+    assert_same_shape(np.zeros((num_examples, hidden_size)), grad2.dLdx)
+    assert_same_shape(layer2.s0, grad2.dLds_prev)
+    assert_same_shape(layer2.h0, grad2.dLdh_prev)
+    for th, dth in zip(layer2.theta, grad2.dLdtheta):
+        assert_same_shape(th, dth)
+
+    '''num_epochs = 10000
+    learning_rate = .1
+    for i in range(num_epochs):
+        grad = lstmnet.backprop_once(x, dloss)
+        #layer.update_theta_s0_h0(grad, learning_rate)
+        #outp = layer.forward_prop_once(x)
+        print(loss(outp[1]))
+    outp = layer.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]))
+    print(outp[1])'''

@@ -59,8 +59,7 @@ class LSTM_layer:
     # to the output vector h. It should only be a function of h.
     # s_next_grad and h_next_grad are the gradients of s(t+1) and h(t+1)
     # default values for next_grad vectors are zero-vectors
-    # returns tuple containing gradients of parameters theta, x, s_prev, and
-    # h_prev, in that order
+    # returns an LSTM_layer_gradient object
     # note that for all matrix arguments to this function, num_examples is
     # the size of the first dimension
     def backprop(self, x, dloss, s_prev=None, h_prev=None,
@@ -228,3 +227,64 @@ class LSTM:
             outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
             x = h[-1]
         return outp
+
+    # perform backpropagation on one element in the sequence
+    # x is the input, size (num_examples, input_size)
+    # dloss is a function that computes the gradient of the loss function,
+    # given the output
+    # s_prev is a list of s(t-1) matrices for each layer
+    # h_prev is a list of h(t-1) matrices for each layer
+    # s_next_grad is a list of s(t+1) gradients for each layer
+    # h_next_grad is a list of h(t+1) gradients for each layer
+    # returns a list of LSTM_layer_gradient objects
+    def backprop_once(self, x, dloss, s_prev=None, h_prev=None,
+            s_next_grad=None, h_next_grad=None):
+        # default values for s_prev and h_prev
+        num_examples = x.shape[0]
+        s_prev_is_none = False
+        if s_prev is None:
+            s_prev = [layer.s0.repeat(num_examples, axis=0) for layer in
+                self.layers]
+            s_prev_is_none = True
+        h_prev_is_none = False
+        if h_prev is None:
+            h_prev = [layer.h0.repeat(num_examples, axis=0) for layer in
+                self.layers]
+            h_prev_is_none = True
+
+        # default values for s_next_grad and h_next_grad
+        s_next_is_none = False
+        if s_next_grad is None:
+            s_next_grad = [np.zeros((num_examples, layer.output_size))
+                for layer in self.layers]
+            s_next_is_none = True
+        h_next_is_none = False
+        if h_next_grad is None:
+            h_next_grad = [np.zeros((num_examples, layer.output_size))
+                for layer in self.layers]
+            h_next_is_none = True
+
+        # forward propagate
+        s, h = self.forward_prop_once(x, s_prev, h_prev)
+
+        # change s_prev, h_prev, s_next_grad, and h_next_grad so that backprop
+        # uses default values
+        if s_prev_is_none:
+            s_prev = [None] * len(self.layers)
+        if h_prev_is_none:
+            h_prev = [None] * len(self.layers)
+        if s_next_is_none:
+            s_next_grad = [None] * len(self.layers)
+        if h_next_is_none:
+            h_next_grad = [None] * len(self.layers)
+
+        # backprop each layer
+        gradient = []
+        for i in range(len(self.layers)-1, -1, -1):
+            inp = x if i==0 else h[i-1]
+            grad_i = self.layers[i].backprop(inp, dloss, s_prev[i], h_prev[i],
+                s_next_grad[i], h_next_grad[i])
+            dloss = lambda h_: grad_i.dLdx
+            gradient.append(grad_i)
+
+        return gradient[::-1]

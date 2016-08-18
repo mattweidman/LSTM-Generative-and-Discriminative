@@ -2,7 +2,7 @@ TODO
 
 Add a softmax layer for the output of the LSTM
 
-Find gradient of LSTM on single elements
+Make sure I'm adding s_next_grad and h_next_grad in the right places
 Perform BPTT on LSTM for sequences
 Train LSTM by SGD
 Adagrad, Adadelta, RMSprop, Conjugate gradient descent?
