@@ -6,6 +6,7 @@ from LSTM import LSTM_layer, LSTM
 list_of_chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', ' ']
 num_chars = len(list_of_chars)
+char_dict = dict((c,i) for i,c in enumerate(list_of_chars))
 
 def vector_to_char(vector):
     index = np.argmin(vector)
@@ -18,13 +19,18 @@ def matrix_to_string(mat):
         output_str += c
     return output_str
 
+def char_to_vector(c):
+    ans = np.zeros((num_chars))
+    ans[char_dict[c]] = 1
+    return ans
+
 def softmax(x):
     denominator = np.sum(np.exp(x), axis=1)[:,np.newaxis]
     return np.exp(x)/denominator
 
 if __name__ == "__main__":
 
-    '''# construct the LSTM
+    # construct the LSTM
     input_size = num_chars
     hidden_size = 30
     output_size = num_chars
@@ -38,13 +44,21 @@ if __name__ == "__main__":
     X_once = np.random.randn(num_examples, input_size)
     X_sequence = np.random.randn(num_examples, seq_length, input_size)
 
-    # use the LSTM
+    # train the LSTM
+    y = char_to_vector('q')
+    def dloss(h):
+        return 1/h.shape[0] * (h-y)
+    grad = network.BPTT_one2one(X_sequence, dloss)
+    for gl in grad:
+        print(gl.to_tuple())
+
+    '''# use the LSTM
     sequence_tensor = network.forward_prop_one2one(X_sequence)
     for matx in sequence_tensor:
         outp = matrix_to_string(matx)
         print(outp)'''
 
-    # backprop for multiple layers
+    '''# backprop for multiple layers
     input_size = 5
     hidden_size = 10
     output_size = 5
@@ -61,8 +75,6 @@ if __name__ == "__main__":
             np.zeros((n_ex, out_size))]
     s_prev = make_inner_matx()
     h_prev = make_inner_matx()
-    s_next_grad = make_inner_matx()
-    h_next_grad = make_inner_matx()
 
     layer1 = LSTM_layer(input_size, hidden_size)
     layer2 = LSTM_layer(hidden_size, output_size)
@@ -110,4 +122,4 @@ if __name__ == "__main__":
     outp = lstmnet.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
         [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]),
         make_inner_matx(n_ex=5), make_inner_matx(n_ex=5))
-    print(outp[1][-1])
+    print(outp[1][-1])'''

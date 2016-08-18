@@ -137,6 +137,11 @@ class LSTM_layer_gradient():
     def to_tuple(self):
         return self.dLdtheta, self.dLdx, self.dLds_prev, self.dLdh_prev
 
+    def add(self, other):
+        return LSTM_layer_gradient(self.dLdtheta+other.dLdtheta,
+            self.dLdx+other.dLdx, self.dLds_prev+other.dLds_prev,
+            self.dLdh_prev+other.dLdh_prev)
+
 class LSTM:
     def __init__(self):
         self.layers = []
@@ -211,7 +216,7 @@ class LSTM:
     # returns a list of LSTM_layer_gradient objects
     def backprop_once(self, x, dloss, s_prev, h_prev, s_next_grad=None,
             h_next_grad=None):
-            
+
         # default values for s_next_grad and h_next_grad
         if s_next_grad is None:
             s_next_grad = [None] * len(self.layers)
@@ -231,3 +236,50 @@ class LSTM:
             gradient.append(grad_i)
 
         return gradient[::-1]
+
+    # perform backpropagation through time on input X
+    # X is size (num_examples, sequence_length, input_size)
+    # s0 and h0 are initial internal state and hidden layer lists
+    # sn_grad and hn_grad are gradients you can inject into the last element
+    # of the sequence during backprop
+    # dloss is the gradient of the loss function; function of h
+    def BPTT_one2one(self, X, dloss, s0=None, h0=None, sn_grad=None,
+            hn_grad=None):
+
+        # zeros as default values
+        num_examples = X.shape[0]
+        empty_or_same = lambda v: [np.zeros((num_examples, l.output_size))
+            for l in self.layers] if v is None else v
+        s0 = empty_or_same(s0)
+        h0 = empty_or_same(h0)
+        sn_grad = empty_or_same(sn_grad)
+        hn_grad = empty_or_same(hn_grad)
+
+        # forward prop through sequence
+        s, h = s0, h0
+        slist, hlist = [], []
+        for x in X.swapaxes(0,1):
+            s, h = self.forward_prop_once(x, s, h)
+            slist.append(s)
+            hlist.append(h)
+
+        # backprop for every element in the sequence
+        s_next_grad = sn_grad
+        h_next_grad = hn_grad
+        seq_length = X.shape[1]
+        gradients = []
+        for i in range(seq_length-1, -1, -1):
+            s_prev = s0 if i == 0 else slist[i-1]
+            h_prev = h0 if i == 0 else hlist[i-1]
+            grad = self.backprop_once(X[:,i,:], dloss, s_prev, h_prev,
+                s_next_grad, h_next_grad)
+            s_next_grad = [gl.dLds_prev for gl in grad]
+            h_next_grad = [gl.dLdh_prev for gl in grad]
+            gradients.append(grad)
+
+        # sum the gradients
+        gradsum = gradients[0]
+        for i in range(1, len(gradients)):
+            for sum_layer, grad_layer in zip(gradsum, gradients[i]):
+                sum_layer = sum_layer.add(grad_layer)
+        return gradsum

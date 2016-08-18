@@ -2,8 +2,13 @@ TODO
 
 Add a softmax layer for the output of the LSTM
 
-Make updating s0 and h0 work for multiple layer LSTM
 Make sure I'm adding s_next_grad and h_next_grad in the right places
-Perform BPTT on LSTM for sequences
+
+Perform BPTT on LSTM for entire sequences
+Perform BPTT on LSTM using subsequences of size k
 Train LSTM by SGD
 Adagrad, Adadelta, RMSprop, Conjugate gradient descent?
+
+Make it so you that backprop_once() doesn't have to forward prop twice
+
+Make it so dloss() can be a function of more than just h
