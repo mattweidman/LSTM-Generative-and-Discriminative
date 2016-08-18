@@ -12,6 +12,7 @@ def vector_to_char(vector):
     index = np.argmin(vector)
     return list_of_chars[index]
 
+# matrix size: (seq_length, num_chars)
 def matrix_to_string(mat):
     output_str = ''
     for v in mat:
@@ -19,7 +20,7 @@ def matrix_to_string(mat):
         output_str += c
     return output_str
 
-def char_to_vector(c):
+def char_to_vec(c):
     ans = np.zeros((num_chars))
     ans[char_dict[c]] = 1
     return ans
@@ -39,24 +40,41 @@ if __name__ == "__main__":
     network.add_layer(LSTM_layer(hidden_size, output_size))
 
     # construct the input
-    seq_length = 50
-    num_examples = 10
+    seq_length = 20
+    num_examples = 100
     X_once = np.random.randn(num_examples, input_size)
-    X_sequence = np.random.randn(num_examples, seq_length, input_size)
+    X_sequence = np.zeros((num_examples, seq_length, input_size))
+    for i in range(num_examples):
+        randind = random.randint(0, num_chars-1)
+        for j in range(seq_length):
+            X_sequence[i,j,randind] = 1
 
-    # train the LSTM
-    y = char_to_vector('q')
-    def dloss(h):
-        return 1/h.shape[0] * (h-y)
-    grad = network.BPTT_one2one(X_sequence, dloss)
-    for gl in grad:
-        print(gl.to_tuple())
+    # loss function and its gradient
+    def loss(h_, x_):
+        return 1/(2*h_.shape[0]) * np.sum((h_-x_)**2)
+    def dloss(h_, x_):
+        return 1/h_.shape[0] * (h_-x_)
+    dloss_i = lambda h_, i_: dloss(h_, X_sequence[:,i_,:])
 
-    '''# use the LSTM
-    sequence_tensor = network.forward_prop_one2one(X_sequence)
+    # train
+    num_epochs = 1000
+    learning_rate = 3
+    for i in range(num_epochs):
+        grad = network.BPTT_one2one(X_sequence, dloss_i)
+        network.update_theta(grad, learning_rate)
+        outp = network.forward_prop_one2one(X_sequence)
+        total_loss = loss(outp, X_sequence)
+        print(total_loss)
+
+    # use the LSTM
+    def char_to_matx(c, length=seq_length):
+        return [char_to_vec(c)] * length
+    inp = np.array([char_to_matx('a'), char_to_matx('b'), char_to_matx('c')])
+    print(inp.shape)
+    sequence_tensor = network.forward_prop_one2one(inp)
     for matx in sequence_tensor:
         outp = matrix_to_string(matx)
-        print(outp)'''
+        print("\"" + str(outp) + "\"")
 
     '''# backprop for multiple layers
     input_size = 5

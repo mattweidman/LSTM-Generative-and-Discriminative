@@ -242,7 +242,8 @@ class LSTM:
     # s0 and h0 are initial internal state and hidden layer lists
     # sn_grad and hn_grad are gradients you can inject into the last element
     # of the sequence during backprop
-    # dloss is the gradient of the loss function; function of h
+    # dloss is the gradient of the loss function; function of h and i, where i
+    # is the index of the current sequence element
     def BPTT_one2one(self, X, dloss, s0=None, h0=None, sn_grad=None,
             hn_grad=None):
 
@@ -271,8 +272,8 @@ class LSTM:
         for i in range(seq_length-1, -1, -1):
             s_prev = s0 if i == 0 else slist[i-1]
             h_prev = h0 if i == 0 else hlist[i-1]
-            grad = self.backprop_once(X[:,i,:], dloss, s_prev, h_prev,
-                s_next_grad, h_next_grad)
+            grad = self.backprop_once(X[:,i,:], lambda h_: dloss(h_, i),
+                s_prev, h_prev, s_next_grad, h_next_grad)
             s_next_grad = [gl.dLds_prev for gl in grad]
             h_next_grad = [gl.dLdh_prev for gl in grad]
             gradients.append(grad)
@@ -283,3 +284,8 @@ class LSTM:
             for sum_layer, grad_layer in zip(gradsum, gradients[i]):
                 sum_layer = sum_layer.add(grad_layer)
         return gradsum
+
+    # use the gradient to update parameters in theta
+    def update_theta(self, gradient, learning_rate):
+        for l, g in zip(self.layers, gradient):
+            l.update_theta(g, learning_rate)
