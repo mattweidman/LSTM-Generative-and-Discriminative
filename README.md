@@ -6,6 +6,6 @@ In this project, I create 2 LSTM networks: A generative network and a descrimina
 
 This is similar to the generative adversarial network (GAN) developed by Goodfellow et al, 2014.
 
-Code for creating and training LSTM's is in LSTM.py. Testing code is in generator.py, but this file will later contain code for the generative network.
+Code for creating and training LSTM's is in LSTM.py and LSTM_layer.py. Testing code is in generator.py, but this file will later contain code for the generative network.
 
 So far, this program only uses numpy, not theano or tensorflow.

@@ -1,7 +1,8 @@
 import numpy as np
 import random
 
-from LSTM import LSTM_layer, LSTM
+from LSTM_layer import LSTM_layer
+from LSTM import LSTM
 
 list_of_chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', ' ']
