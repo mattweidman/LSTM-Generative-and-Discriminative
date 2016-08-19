@@ -51,11 +51,10 @@ if __name__ == "__main__":
     seq_length = 5
     num_examples = 1000
     def gen_x_sequence():
-        X_sequence = np.zeros((num_examples, seq_length, input_size))
+        X_sequence = np.zeros((num_examples, input_size))
         for i in range(num_examples):
             randind = random.randint(0, num_chars-1)
-            for j in range(seq_length):
-                X_sequence[i,j,randind] = 1
+            X_sequence[i,randind] = 1
         return X_sequence
     def normalize(v):
         return (v-v.mean())/v.std()
@@ -72,15 +71,16 @@ if __name__ == "__main__":
         return 1/get_n(h_) * (h_-x_)
 
     # train
-    num_epochs = 100
+    num_epochs = 1000
     learning_rate = 10
     for i in range(num_epochs):
         X_sequence = gen_x_sequence()
-        dloss_i = lambda h_, i_: dloss(h_, X_sequence[:,i_,:])
-        grad = network.BPTT_one2one(normalize(X_sequence), dloss_i)
+        dloss_i = lambda h_, i_: dloss(h_, X_sequence)
+        grad = network.BPTT_feedback(normalize(X_sequence), seq_length, dloss_i)
         network.update_theta(grad, learning_rate)
-        outp = network.forward_prop_one2one(normalize(X_sequence))
-        total_loss = loss(outp, X_sequence)
+        outp = network.forward_prop_feedback(normalize(X_sequence), seq_length)
+        total_loss = loss(outp, X_sequence[:,np.newaxis,:].repeat(seq_length,
+            axis=1))
         magnitude = sum([gl.magnitude_theta() for gl in grad])
         print("cost:%f\tgradient:%f" % (total_loss, magnitude))
 

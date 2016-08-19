@@ -289,6 +289,60 @@ class LSTM:
                 sum_layer = sum_layer.add(grad_layer)
         return gradsum
 
+    # perform backpropagation through time on input x by feeding outputs of
+    # step t as inputs into step t+1
+    # x is size (num_examples, input_size)
+    # s0 and h0 are initial internal state and hidden layer lists
+    # sn_grad and hn_grad are gradients you can inject into the last element
+    # of the sequence during backprop
+    # dloss is the gradient of the loss function; function of h and i, where i
+    # is the index of the current sequence element
+    def BPTT_feedback(self, x, seq_length, dloss, s0=None, h0=None,
+            sn_grad=None, hn_grad=None):
+
+        # zeros as default values
+        num_examples = x.shape[0]
+        empty_or_same = lambda v: [np.zeros((num_examples, l.output_size))
+            for l in self.layers] if v is None else v
+        s0 = empty_or_same(s0)
+        h0 = empty_or_same(h0)
+        sn_grad = empty_or_same(sn_grad)
+        hn_grad = empty_or_same(hn_grad)
+
+        # forward prop through sequence
+        s, h = s0, h0
+        slist, hlist = [], []
+        X = np.zeros((x.shape[0], 0, x.shape[1]))
+        for i in range(seq_length):
+            X = np.concatenate((X, x[:,np.newaxis,:]), axis=1)
+            s, h = self.forward_prop_once(x, s, h)
+            slist.append(s)
+            hlist.append(h)
+            x = h[-1]
+
+        # backprop for every element in the sequence
+        s_next_grad = sn_grad
+        h_next_grad = hn_grad
+        x_next_grad = np.zeros((num_examples, self.layers[0].input_size))
+        gradients = []
+        for i in range(seq_length-1, -1, -1):
+            s_prev = s0 if i == 0 else slist[i-1]
+            h_prev = h0 if i == 0 else hlist[i-1]
+            grad = self.backprop_once(X[:,i,:],
+                lambda h_: dloss(h_, i) + x_next_grad,
+                s_prev, h_prev, s_next_grad, h_next_grad)
+            s_next_grad = [gl.dLds_prev for gl in grad]
+            h_next_grad = [gl.dLdh_prev for gl in grad]
+            x_next_grad = grad[0].dLdx
+            gradients.append(grad)
+
+        # sum the gradients
+        gradsum = gradients[0]
+        for i in range(1, len(gradients)):
+            for sum_layer, grad_layer in zip(gradsum, gradients[i]):
+                sum_layer = sum_layer.add(grad_layer)
+        return gradsum
+
     # use the gradient to update parameters in theta
     def update_theta(self, gradient, learning_rate):
         for l, g in zip(self.layers, gradient):
