@@ -38,7 +38,9 @@ class LSTM_layer:
     # s_prev: previous internal state size (num_examples, output_size)
     # h_prev: previous output from this hidden layer, same size as s_prev
     # returns (internal state, hidden layer) tuple
-    def forward_prop_once(self, x, s_prev, h_prev):
+    # if return_gates is true, returns a (g, i, f, o, s, h) tuple as well, each
+    # size (output_size, num_examples)
+    def forward_prop_once(self, x, s_prev, h_prev, return_gates=False):
         g = phi(self.Wgx.dot(x.T) +
             self.Wgh.dot(h_prev.T) +
             self.bg)
@@ -47,7 +49,10 @@ class LSTM_layer:
         o = sigmoid(self.Wox.dot(x.T) + self.Woh.dot(h_prev.T) + self.bo)
         s = g*i + s_prev.T*f
         h = phi(s)*o
-        return s.T, h.T
+        if return_gates:
+            return s.T, h.T, (g, i, f, o, s, h)
+        else:
+            return s.T, h.T
 
     # finds the gradient of this LSTM layer by propagating forward and back
     # x, s_prev, and h_prev are as described in forward_prop_once
@@ -58,8 +63,10 @@ class LSTM_layer:
     # returns an LSTM_layer_gradient object
     # note that for all matrix arguments to this function, num_examples is
     # the size of the first dimension
+    # gate_values is a (g, i, f, o, s, h) tuple, each representing a gate, size
+    # (output_size, num_examples)
     def backprop(self, x, dloss, s_prev, h_prev, s_next_grad=None,
-            h_next_grad=None):
+            h_next_grad=None, gate_values=None):
 
         # default values for s_next_grad and h_next_grad
         if s_next_grad is None:
@@ -68,12 +75,15 @@ class LSTM_layer:
             h_next_grad = np.zeros(h_prev.shape)
 
         # propagate forward
-        g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
-        i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
-        f = sigmoid(self.Wfx.dot(x.T) + self.Wfh.dot(h_prev.T) + self.bf)
-        o = sigmoid(self.Wox.dot(x.T) + self.Woh.dot(h_prev.T) + self.bo)
-        s = g*i + s_prev.T*f
-        h = phi(s)*o
+        if gate_values is None:
+            g = phi(self.Wgx.dot(x.T) + self.Wgh.dot(h_prev.T) + self.bg)
+            i = sigmoid(self.Wix.dot(x.T) + self.Wih.dot(h_prev.T) + self.bi)
+            f = sigmoid(self.Wfx.dot(x.T) + self.Wfh.dot(h_prev.T) + self.bf)
+            o = sigmoid(self.Wox.dot(x.T) + self.Woh.dot(h_prev.T) + self.bo)
+            s = g*i + s_prev.T*f
+            h = phi(s)*o
+        else:
+            g, i, f, o, s, h = gate_values
 
         # backprop to each gate
         dLdh = dloss(h.T).T + h_next_grad.T
@@ -159,15 +169,26 @@ class LSTM:
     # elements of s_prev and h_prev are size (num_examples, layer_output_size)
     # returns (internal state, hidden layer) tuple (which are same
     # dimensions as s_prev and h_prev)
-    def forward_prop_once(self, x, s_prev, h_prev):
+    # if return_gates is true, also returns list of (g,i,f,o,s,h) tuples
+    def forward_prop_once(self, x, s_prev, h_prev, return_gates=False):
         s = []
         h = []
+        gates = []
         for i in range(len(self.layers)):
-            si, hi = self.layers[i].forward_prop_once(x, s_prev[i], h_prev[i])
+            if return_gates:
+                si, hi, gi = self.layers[i].forward_prop_once(x, s_prev[i],
+                    h_prev[i], return_gates)
+                gates.append(gi)
+            else:
+                si, hi = self.layers[i].forward_prop_once(x, s_prev[i],
+                    h_prev[i])
             s.append(si)
             h.append(hi)
             x = hi.copy()
-        return s, h
+        if return_gates:
+            return s, h, gates
+        else:
+            return s, h
 
     # using a sequence of inputs, creates a sequence of outputs
     # X is a tensor of size (num_examples, sequence_length, input_size)
@@ -228,14 +249,15 @@ class LSTM:
             h_next_grad = [None] * len(self.layers)
 
         # forward propagate
-        s, h = self.forward_prop_once(x, s_prev, h_prev)
+        s, h, gates = self.forward_prop_once(x, s_prev, h_prev,
+            return_gates=True)
 
         # backprop each layer
         gradient = []
         for i in range(len(self.layers)-1, -1, -1):
             inp = x if i==0 else h[i-1]
             grad_i = self.layers[i].backprop(inp, dloss, s_prev[i], h_prev[i],
-                s_next_grad[i], h_next_grad[i])
+                s_next_grad[i], h_next_grad[i], gates[i])
             dloss = lambda h_: grad_i.dLdx
             gradient.append(grad_i)
 
