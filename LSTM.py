@@ -39,40 +39,61 @@ class LSTM:
         else:
             return s, h
 
-    # using a sequence of inputs, creates a sequence of outputs
-    # X is a tensor of size (num_examples, sequence_length, input_size)
-    # the output is a tensor Y which is size (num_examples, sequence_length,
-    # output_size)
-    # there is exactly one output for every input
-    def forward_prop_one2one(self, X, s0=None, h0=None):
+    # forward propagate input through this LSTM
+    # X is a matrix of size (num_examples, input_size) if feedback
+    # X is size (num_examples, seq_length, input_size) if one2one
+    # for feedback, the output at each timestep is calculated by using the
+    # previous output as input, and seq_length MUST be provided
+    # if seq_length is not provided, assume one2one
+    # input_size and output_size must therefore be the same if feedback
+    # returns (X, slist, hlist) tuple, where X is a
+    # (num_examples, seq_length, input_size) tensor and slist and hlist are
+    # lists of s and h values for each sequence element
+    def forward_prop_lists(self, X, seq_length=None, s0=None, h0=None):
+
+        # record whether this is feedback, sanity checks
+        is_feedback = seq_length is not None
+        if seq_length is None:
+            assert len(X.shape) == 3
+            seq_length = X.shape[1]
+        else:
+            assert len(X.shape) == 2
+
+        # default values
         num_examples = X.shape[0]
         s0 = self.empty_or_same(num_examples, s0)
-        s = s0
         h0 = self.empty_or_same(num_examples, h0)
-        h = h0
-        outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
-        for x in X.swapaxes(0,1):
-            s, h = self.forward_prop_once(x, s, h)
-            outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
-        return outp
 
-    # using a single input, generate a sequence of outputs
-    # x is a matrix of size (num_examples, input_size)
-    # the output Y is size (num_examples, sequence_length, output_size)
-    # the output at each timestep is calculated by using the previous output
-    # as input
-    # input_size and output_size must therefore be the same
-    def forward_prop_feedback(self, x, sequence_length, s0=None, h0=None):
-        num_examples = x.shape[0]
-        s0 = self.empty_or_same(num_examples, s0)
-        s = s0
-        h0 = self.empty_or_same(num_examples, h0)
-        h = h0
-        outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
-        for i in range(sequence_length):
+        # forward prop through sequence
+        s, h = s0, h0
+        slist, hlist = [], []
+        if is_feedback:
+            x = X
+            X = np.zeros((x.shape[0], 0, x.shape[1]))
+        for i in range(seq_length):
+            if is_feedback: X = np.concatenate((X, x[:,np.newaxis,:]), axis=1)
+            else: x = X[:,i,:]
             s, h = self.forward_prop_once(x, s, h)
+            slist.append(s)
+            hlist.append(h)
+            if is_feedback: x = h[-1]
+
+        return X, slist, hlist
+
+    # forward propagate input through this LSTM
+    # X is a matrix of size (num_examples, input_size) if feedback
+    # X is size (num_examples, seq_length, input_size) if one2one
+    # for feedback, the output at each timestep is calculated by using the
+    # previous output as input, and seq_length MUST be provided
+    # if seq_length is not provided, assume one2one
+    # input_size and output_size must therefore be the same if feedback
+    # returns an output Y of size (num_examples, seq_length, output_size)
+    def forward_prop(self, X, seq_length=None, s0=None, h0=None):
+        X, slist, hlist = self.forward_prop_lists(X, seq_length, s0, h0)
+        num_examples = X.shape[0]
+        outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
+        for h in hlist:
             outp = np.concatenate((outp, h[-1][:,np.newaxis,:]), axis=1)
-            x = h[-1]
         return outp
 
     # perform backpropagation on one element in the sequence
@@ -87,11 +108,13 @@ class LSTM:
     def backprop_once(self, x, dloss, s_prev, h_prev, s_next_grad=None,
             h_next_grad=None):
 
-        # default values for s_next_grad and h_next_grad
-        if s_next_grad is None:
-            s_next_grad = [None] * len(self.layers)
-        if h_next_grad is None:
-            h_next_grad = [None] * len(self.layers)
+        # default values for s_prev, h_prev, s_next_grad, and h_next_grad
+        num_examples = x.shape[0]
+        nonelist = lambda: [None] * len(self.layers)
+        s_prev = self.empty_or_same(num_examples, s_prev)
+        h_prev = self.empty_or_same(num_examples, h_prev)
+        if s_next_grad is None: s_next_grad = nonelist()
+        if h_next_grad is None: h_next_grad = nonelist()
 
         # forward propagate
         s, h, gates = self.forward_prop_once(x, s_prev, h_prev,
@@ -122,38 +145,15 @@ class LSTM:
     def BPTT(self, X, dloss, seq_length=None, s0=None, h0=None, sn_grad=None,
             hn_grad=None):
 
-        is_feedback = seq_length is not None
-        if seq_length is None:
-            assert len(X.shape) == 3
-            seq_length = X.shape[1]
-        else:
-            assert len(X.shape) == 2
-
-        # zeros as default values
         num_examples = X.shape[0]
-        empty_or_same = lambda v: [np.zeros((num_examples, l.output_size))
-            for l in self.layers] if v is None else v
-        s0 = empty_or_same(s0)
-        h0 = empty_or_same(h0)
-        sn_grad = empty_or_same(sn_grad)
-        hn_grad = empty_or_same(hn_grad)
 
         # forward prop through sequence
         s, h = s0, h0
-        slist, hlist = [], []
-        if is_feedback:
-            x = X
-            X = np.zeros((x.shape[0], 0, x.shape[1]))
-        for i in range(seq_length):
-            if is_feedback:
-                X = np.concatenate((X, x[:,np.newaxis,:]), axis=1)
-            else:
-                x = X[:,i,:]
-            s, h = self.forward_prop_once(x, s, h)
-            slist.append(s)
-            hlist.append(h)
-            if is_feedback:
-                x = h[-1]
+        X, slist, hlist = self.forward_prop_lists(X, seq_length=seq_length,
+            s0=s0, h0=h0)
+
+        is_feedback = seq_length is not None
+        if seq_length is None: seq_length = X.shape[1]
 
         # backprop for every element in the sequence
         s_next_grad = sn_grad

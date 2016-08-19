@@ -7,4 +7,3 @@ Make it so dloss() can be a function of more than just h
 Add a softmax layer for the output of the LSTM
 
 Perform BPTT on LSTM using subsequences of size k
-
