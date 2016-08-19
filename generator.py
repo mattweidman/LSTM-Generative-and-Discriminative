@@ -73,18 +73,15 @@ if __name__ == "__main__":
         for dim in h_.shape[:-1]:
             n *= dim
         return n
-    def loss(h_, x_):
-        return 1/(2*get_n(h_)) * np.sum((h_-x_)**2)
-    def dloss(h_, x_):
-        return 1/get_n(h_) * (h_-x_)
+    def loss(h_, y_):
+        return 1/(2*get_n(h_)) * np.sum((h_-y_)**2)
+    def dloss(h_, y_):
+        return 1/get_n(h_) * (h_-y_)
 
-    '''# train feedback
-    X = gen_x_once()
-    network.SGD(normalize(X),
-        lambda h_, i_: loss(h_[:,i_,:], X)/seq_length,
-        lambda h_, i_: dloss(h_, X),
-        1000, 10, seq_length=seq_length,
-        print_progress=True)
+    # train feedback
+    X = gen_x_sequence()
+    network.SGD(normalize(X[:,0,:]), X, loss, dloss, 1000, 10, batch_size=200,
+        seq_length=seq_length, print_progress=True)
 
     # use the LSTM, feedback
     def char_to_matx(c, length=seq_length):
@@ -93,13 +90,11 @@ if __name__ == "__main__":
     print(inp.shape)
     outp = network.forward_prop(normalize(inp), seq_length=seq_length)
     for i in range(inp.shape[0]):
-        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))'''
+        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
 
     # train one2one
     X = gen_x_sequence()
-    network.SGD(normalize(X),
-        lambda h_, i_: loss(h_[:,i_,:], X[:,i_,:])/seq_length,
-        lambda h_, i_: dloss(h_, X[:,i_,:]), 100, 10,
+    network.SGD(normalize(X), X, loss, dloss, 1000, 10, batch_size=200,
         print_progress=True)
 
     # use the LSTM, one2one
@@ -110,69 +105,3 @@ if __name__ == "__main__":
     outp = network.forward_prop(normalize(inp))
     for i in range(inp.shape[0]):
         print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
-
-    '''# backprop for multiple layers
-    input_size = 5
-    hidden_size = 10
-    output_size = 5
-    num_examples = 1000
-
-    x = np.zeros((num_examples, input_size))
-    for row in x:
-        randind = random.randint(0, input_size-1)
-        row[randind] = 1
-
-    def make_inner_matx(n_ex=num_examples, hid_size=hidden_size,
-            out_size=output_size):
-        return [np.zeros((n_ex, hid_size)),
-            np.zeros((n_ex, out_size))]
-    s_prev = make_inner_matx()
-    h_prev = make_inner_matx()
-
-    layer1 = LSTM_layer(input_size, hidden_size)
-    layer2 = LSTM_layer(hidden_size, output_size)
-    lstmnet = LSTM()
-    lstmnet.add_layer(layer1)
-    lstmnet.add_layer(layer2)
-
-    def loss(h):
-        n_ex = h.shape[0]
-        return 1/(2*n_ex) * np.sum((x-h)**2)
-
-    def dloss(h):
-        n_ex = h.shape[0]
-        return 1/n_ex * (h-x)
-
-    def assert_same_shape(a1, a2):
-        assert len(a1.shape) == len(a2.shape)
-        for i in range(len(a1.shape)):
-            assert a1.shape[i] == a2.shape[i]
-
-    lstm_grad = lstmnet.backprop_once(x, dloss, s_prev, h_prev)
-
-    grad1 = lstm_grad[0]
-    assert_same_shape(x, grad1.dLdx)
-    assert_same_shape(s_prev[0], grad1.dLds_prev)
-    assert_same_shape(h_prev[0], grad1.dLdh_prev)
-    for th, dth in zip(layer1.theta, grad1.dLdtheta):
-        assert_same_shape(th, dth)
-
-    grad2 = lstm_grad[1]
-    assert_same_shape(np.zeros((num_examples, hidden_size)), grad2.dLdx)
-    assert_same_shape(s_prev[1], grad2.dLds_prev)
-    assert_same_shape(h_prev[1], grad2.dLdh_prev)
-    for th, dth in zip(layer2.theta, grad2.dLdtheta):
-        assert_same_shape(th, dth)
-
-    num_epochs = 1000
-    learning_rate = 3
-    for i in range(num_epochs):
-        grad = lstmnet.backprop_once(x, dloss, s_prev, h_prev)
-        for layer, layer_grad in zip(lstmnet.layers, grad):
-            layer.update_theta(layer_grad, learning_rate)
-        outp = lstmnet.forward_prop_once(x, s_prev, h_prev)
-        print(loss(outp[1][-1]))
-    outp = lstmnet.forward_prop_once(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]]),
-        make_inner_matx(n_ex=5), make_inner_matx(n_ex=5))
-    print(outp[1][-1])'''

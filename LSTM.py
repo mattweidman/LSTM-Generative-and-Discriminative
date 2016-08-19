@@ -98,14 +98,15 @@ class LSTM:
 
     # perform backpropagation on one element in the sequence
     # x is the input, size (num_examples, input_size)
+    # y is the expected output, size (num_examples, output_size)
     # dloss is a function that computes the gradient of the loss function,
-    # given the output
+    # given the output (h) and the expected output (y)
     # s_prev is a list of s(t-1) matrices for each layer
     # h_prev is a list of h(t-1) matrices for each layer
     # s_next_grad is a list of s(t+1) gradients for each layer
     # h_next_grad is a list of h(t+1) gradients for each layer
     # returns a list of LSTM_layer_gradient objects
-    def backprop_once(self, x, dloss, s_prev, h_prev, s_next_grad=None,
+    def backprop_once(self, x, y, dloss, s_prev, h_prev, s_next_grad=None,
             h_next_grad=None):
 
         # default values for s_prev, h_prev, s_next_grad, and h_next_grad
@@ -122,27 +123,28 @@ class LSTM:
 
         # backprop each layer
         gradient = []
+        layer_dloss = lambda h_: dloss(h_, y)
         for i in range(len(self.layers)-1, -1, -1):
             inp = x if i==0 else h[i-1]
-            grad_i = self.layers[i].backprop(inp, dloss, s_prev[i], h_prev[i],
-                s_next_grad[i], h_next_grad[i], gates[i])
-            dloss = lambda h_: grad_i.dLdx
+            grad_i = self.layers[i].backprop(inp, layer_dloss, s_prev[i],
+                h_prev[i], s_next_grad[i], h_next_grad[i], gates[i])
+            layer_dloss = lambda h_: grad_i.dLdx
             gradient.append(grad_i)
 
         return gradient[::-1]
 
     # perform backpropagation through time on input X
-    # X is input size (num_examples, sequence_length, input_size) for one2one
+    # X is input size (num_examples, seq_length, input_size) for one2one
     # X is size (num_examples, input_size) for feedback
+    # Y is the expected output; size (num_examples, seq_length, output_size)
     # seq_length MUST be provided for feedback BPTT, which is the length of
     # the sequence to be output
     # if seq_length is None, one2one will be assumed; else, feedback is assumed
     # s0 and h0 are initial internal state and hidden layer lists
     # sn_grad and hn_grad are gradients you can inject into the last element
     # of the sequence during backprop
-    # dloss is the gradient of the loss function; function of h and i, where i
-    # is the index of the current sequence element
-    def BPTT(self, X, dloss, seq_length=None, s0=None, h0=None, sn_grad=None,
+    # dloss is the gradient of the loss function; function of h and y
+    def BPTT(self, X, Y, dloss, seq_length=None, s0=None, h0=None, sn_grad=None,
             hn_grad=None):
 
         num_examples = X.shape[0]
@@ -163,8 +165,8 @@ class LSTM:
         for i in range(seq_length-1, -1, -1):
             s_prev = s0 if i == 0 else slist[i-1]
             h_prev = h0 if i == 0 else hlist[i-1]
-            grad = self.backprop_once(X[:,i,:],
-                lambda h_: dloss(h_, i) + x_next_grad,
+            grad = self.backprop_once(X[:,i,:], Y[:,i,:],
+                lambda h_, y_: dloss(h_, y_) + x_next_grad,
                 s_prev, h_prev, s_next_grad, h_next_grad)
             s_next_grad = [gl.dLds_prev for gl in grad]
             h_next_grad = [gl.dLdh_prev for gl in grad]
@@ -185,32 +187,35 @@ class LSTM:
             l.update_theta(g, learning_rate)
 
     # performs stochastic gradient descent
-    # X: input size (num_ex, seq_len, inp_size) if one2one,
+    # X: input; size (num_ex, seq_len, inp_size) if one2one,
     # size (num_ex, inp_size) if feedback
-    # loss: function of h (output) and i (sequence index), computes the loss
-    # dloss: derivative of loss, also function of h
+    # Y: expected output; size (num_ex, seq_len, out_size)
+    # loss: function of h (output) and y (expected output), computes the loss
+    # dloss: derivative of loss, also function of h and y
     # num_epochs: number of iterations to run
     # learning_rate: gradient multiplier during updates
     # momentum: not implemented yet
     # batch_size: number of examples to select; chooses all examples if None
     # seq_length: length of sequence if feedback; if one2one, leave it as None
     # print_progress: prints cost and gradient each iteration if true
-    def SGD(self, X, loss, dloss, num_epochs, learning_rate,
+    def SGD(self, X, Y, loss, dloss, num_epochs, learning_rate,
             momentum=None, batch_size=None, seq_length=None,
             print_progress=False):
         num_examples = X.shape[0]
         for epoch in range(num_epochs):
             if batch_size is None:
-                grad = self.BPTT(X, dloss, seq_length=seq_length)
+                grad = self.BPTT(X, Y, dloss, seq_length=seq_length)
             else:
-                inpt = X[np.random.choice(np.arange(0,num_examples),
-                    batch_size),:,:]
-                grad = self.BPTT(inpt, dloss, seq_length=seq_length)
+                batch_indices = np.random.choice(np.arange(0,num_examples),
+                    batch_size)
+                inpt = X[batch_indices]
+                exp_outp = Y[batch_indices]
+                grad = self.BPTT(inpt, exp_outp, dloss, seq_length=seq_length)
             self.update_theta(grad, learning_rate)
             if print_progress:
                 outp = self.forward_prop(X, seq_length=seq_length)
                 actual_len = X.shape[1] if seq_length is None else seq_length
-                total_loss = sum([loss(outp, j) for j in range(actual_len)])
+                total_loss = loss(outp, Y)
                 magnitude = sum([gl.magnitude_theta() for gl in grad])
                 print("cost:%f\tgradient:%f" % (total_loss, magnitude))
         print("Training complete")
