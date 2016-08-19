@@ -78,44 +78,31 @@ if __name__ == "__main__":
     def dloss(h_, x_):
         return 1/get_n(h_) * (h_-x_)
 
-    # train feedback
-    num_epochs = 10
-    learning_rate = 10
-    for i in range(num_epochs):
-        X_sequence = gen_x_once()
-        dloss_i = lambda h_, i_: dloss(h_, X_sequence)
-        grad = network.BPTT(normalize(X_sequence), dloss_i,
-            seq_length=seq_length)
-        network.update_theta(grad, learning_rate)
-        outp = network.forward_prop(normalize(X_sequence), seq_length)
-        total_loss = loss(outp, X_sequence[:,np.newaxis,:].repeat(seq_length,
-            axis=1))
-        magnitude = sum([gl.magnitude_theta() for gl in grad])
-        print("cost:%f\tgradient:%f" % (total_loss, magnitude))
+    '''# train feedback
+    X = gen_x_once()
+    network.SGD(normalize(X),
+        lambda h_, i_: loss(h_[:,i_,:], X)/seq_length,
+        lambda h_, i_: dloss(h_, X),
+        1000, 10, seq_length=seq_length,
+        print_progress=True)
 
-    # use the LSTM feedback
+    # use the LSTM, feedback
     def char_to_matx(c, length=seq_length):
         return [char_to_vec(c)] * length
     inp = np.array([char_to_vec(chr(c)) for c in range(97, 123)])
     print(inp.shape)
     outp = network.forward_prop(normalize(inp), seq_length=seq_length)
     for i in range(inp.shape[0]):
-        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
+        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))'''
 
     # train one2one
-    num_epochs = 10
-    learning_rate = 10
-    for i in range(num_epochs):
-        X_sequence = gen_x_sequence()
-        dloss_i = lambda h_, i_: dloss(h_, X_sequence[:,i_,:])
-        grad = network.BPTT(normalize(X_sequence), dloss_i)
-        network.update_theta(grad, learning_rate)
-        outp = network.forward_prop(normalize(X_sequence))
-        total_loss = loss(outp, X_sequence)
-        magnitude = sum([gl.magnitude_theta() for gl in grad])
-        print("cost:%f\tgradient:%f" % (total_loss, magnitude))
+    X = gen_x_sequence()
+    network.SGD(normalize(X),
+        lambda h_, i_: loss(h_[:,i_,:], X[:,i_,:])/seq_length,
+        lambda h_, i_: dloss(h_, X[:,i_,:]), 100, 10,
+        print_progress=True)
 
-    # use the LSTM one2one
+    # use the LSTM, one2one
     def char_to_matx(c, length=seq_length):
         return [char_to_vec(c)] * length
     inp = np.array([char_to_matx(chr(c)) for c in range(97, 123)])

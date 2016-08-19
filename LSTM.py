@@ -183,3 +183,34 @@ class LSTM:
     def update_theta(self, gradient, learning_rate):
         for l, g in zip(self.layers, gradient):
             l.update_theta(g, learning_rate)
+
+    # performs stochastic gradient descent
+    # X: input size (num_ex, seq_len, inp_size) if one2one,
+    # size (num_ex, inp_size) if feedback
+    # loss: function of h (output) and i (sequence index), computes the loss
+    # dloss: derivative of loss, also function of h
+    # num_epochs: number of iterations to run
+    # learning_rate: gradient multiplier during updates
+    # momentum: not implemented yet
+    # batch_size: number of examples to select; chooses all examples if None
+    # seq_length: length of sequence if feedback; if one2one, leave it as None
+    # print_progress: prints cost and gradient each iteration if true
+    def SGD(self, X, loss, dloss, num_epochs, learning_rate,
+            momentum=None, batch_size=None, seq_length=None,
+            print_progress=False):
+        num_examples = X.shape[0]
+        for epoch in range(num_epochs):
+            if batch_size is None:
+                grad = self.BPTT(X, dloss, seq_length=seq_length)
+            else:
+                inpt = X[np.random.choice(np.arange(0,num_examples),
+                    batch_size),:,:]
+                grad = self.BPTT(inpt, dloss, seq_length=seq_length)
+            self.update_theta(grad, learning_rate)
+            if print_progress:
+                outp = self.forward_prop(X, seq_length=seq_length)
+                actual_len = X.shape[1] if seq_length is None else seq_length
+                total_loss = sum([loss(outp, j) for j in range(actual_len)])
+                magnitude = sum([gl.magnitude_theta() for gl in grad])
+                print("cost:%f\tgradient:%f" % (total_loss, magnitude))
+        print("Training complete")
