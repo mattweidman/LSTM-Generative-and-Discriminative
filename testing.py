@@ -105,5 +105,71 @@ def test_SGD():
     for i in range(inp.shape[0]):
         print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))'''
 
+def test_0101():
+
+    abc_list = ['a', 'b', 'c']
+    abc_to_ind = dict((c,i) for i,c in enumerate(abc_list))
+
+    def abc_to_vec(c):
+        ind = abc_to_ind[c]
+        ans = np.zeros(len(abc_list))
+        ans[ind] = 1
+        return ans
+
+    def vec_to_abc(vec):
+        return abc_list[np.argmax(vec)]
+
+    # matrix size (sequence_length, len(abc_list))
+    def matrix_to_string(matx):
+        ans = ""
+        for row in matx:
+            ans += vec_to_abc(row)
+        return ans
+
+    def normalize(v):
+        last_axis = len(v.shape)-1
+        vmean = np.expand_dims(v.mean(axis=last_axis), axis=last_axis)
+        vstd = np.expand_dims(v.std(axis=last_axis), axis=last_axis)
+        return (v-vmean)/vstd
+
+    X = normalize(np.array([abc_to_vec('a'), abc_to_vec('b'), abc_to_vec('c')]))
+    Y = np.array([[abc_to_vec('a'), abc_to_vec('b'), abc_to_vec('c')],
+        [abc_to_vec('b'), abc_to_vec('c'), abc_to_vec('a')],
+        [abc_to_vec('c'), abc_to_vec('a'), abc_to_vec('b')]])
+
+    def get_n(tensor):
+        n = 1
+        for dim in tensor.shape[:-1]:
+            n *= dim
+        return n
+
+    def loss(y_out, y_exp):
+        return 1/(2*get_n(y_out)) * np.sum((y_out-y_exp)**2)
+
+    def dloss(y_out, y_exp):
+        return 1/get_n(y_out) * (y_out-y_exp)
+
+    # construct the LSTM
+    input_size = len(abc_list)
+    hidden_size1 = 20
+    hidden_size2 = 20
+    output_size = len(abc_list)
+    layer0 = LSTM_layer(input_size, hidden_size1)
+    layer1 = LSTM_layer(hidden_size1, hidden_size2)
+    layer2 = LSTM_layer(hidden_size2, output_size)
+    lstm = LSTM()
+    lstm.add_layer(layer0)
+    lstm.add_layer(layer1)
+    lstm.add_layer(layer2)
+
+    # train the LSTM
+    lstm.SGD(X, Y, loss, dloss, 1000, 1, batch_size=100,
+        seq_length=Y.shape[1], print_progress=True)
+
+    # print the output of the LSTM
+    outp = lstm.forward_prop(X, seq_length=Y.shape[1])
+    for out_i, y_i in zip(outp, Y):
+        print("%s\t%s" % (matrix_to_string(y_i), matrix_to_string(out_i)))
+
 if __name__ == "__main__":
-    test_SGD()
+    test_0101()
