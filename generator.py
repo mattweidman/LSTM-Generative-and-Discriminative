@@ -80,8 +80,8 @@ if __name__ == "__main__":
 
     # train feedback
     X = gen_x_sequence()
-    network.SGD(normalize(X[:,0,:]), X, loss, dloss, 1000, 10, batch_size=200,
-        seq_length=seq_length, print_progress=True)
+    network.SGD(normalize(X[:,0,:]), X, loss, dloss, 1000, 10, # momentum=0,
+        batch_size=200, seq_length=seq_length, print_progress=True)
 
     # use the LSTM, feedback
     def char_to_matx(c, length=seq_length):
@@ -92,10 +92,10 @@ if __name__ == "__main__":
     for i in range(inp.shape[0]):
         print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
 
-    # train one2one
+    '''# train one2one
     X = gen_x_sequence()
-    network.SGD(normalize(X), X, loss, dloss, 1000, 10, batch_size=200,
-        print_progress=True)
+    network.SGD(normalize(X), X, loss, dloss, 1000, 10, momentum=0.9,
+        batch_size=200, print_progress=True)
 
     # use the LSTM, one2one
     def char_to_matx(c, length=seq_length):
@@ -104,4 +104,4 @@ if __name__ == "__main__":
     print(inp.shape)
     outp = network.forward_prop(normalize(inp))
     for i in range(inp.shape[0]):
-        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))
+        print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))'''

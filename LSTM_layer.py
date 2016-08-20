@@ -147,9 +147,14 @@ class LSTM_layer_gradient():
         return self.dLdtheta, self.dLdx, self.dLds_prev, self.dLdh_prev
 
     def add(self, other):
-        return LSTM_layer_gradient(self.dLdtheta+other.dLdtheta,
-            self.dLdx+other.dLdx, self.dLds_prev+other.dLds_prev,
-            self.dLdh_prev+other.dLdh_prev)
+        dsumtheta = [sth+oth for sth, oth in zip(self.dLdtheta, other.dLdtheta)]
+        return LSTM_layer_gradient(dsumtheta, self.dLdx+other.dLdx,
+            self.dLds_prev+other.dLds_prev, self.dLdh_prev+other.dLdh_prev)
+
+    def multiply(self, scalar):
+        dprodtheta = [sth*scalar for sth in self.dLdtheta]
+        return LSTM_layer_gradient(dprodtheta, self.dLdx*scalar,
+            self.dLds_prev*scalar, self.dLdh_prev*scalar)
 
     def magnitude_theta(self):
         return sum([np.sum(p**2) for p in self.dLdtheta])

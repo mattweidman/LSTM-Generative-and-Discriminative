@@ -194,28 +194,44 @@ class LSTM:
     # dloss: derivative of loss, also function of h and y
     # num_epochs: number of iterations to run
     # learning_rate: gradient multiplier during updates
-    # momentum: not implemented yet
+    # momentum: multiplier for v(t-1) each epoch
     # batch_size: number of examples to select; chooses all examples if None
     # seq_length: length of sequence if feedback; if one2one, leave it as None
     # print_progress: prints cost and gradient each iteration if true
     def SGD(self, X, Y, loss, dloss, num_epochs, learning_rate,
             momentum=None, batch_size=None, seq_length=None,
             print_progress=False):
+
         num_examples = X.shape[0]
+        v_prev = None
         for epoch in range(num_epochs):
+
+            # compute gradient for entire input
             if batch_size is None:
                 grad = self.BPTT(X, Y, dloss, seq_length=seq_length)
+
+            # compute gradient for one batch
             else:
                 batch_indices = np.random.choice(np.arange(0,num_examples),
                     batch_size)
                 inpt = X[batch_indices]
                 exp_outp = Y[batch_indices]
                 grad = self.BPTT(inpt, exp_outp, dloss, seq_length=seq_length)
-            self.update_theta(grad, learning_rate)
+
+            # update parameters
+            if v_prev is not None and momentum is not None:
+                grad = [gl.multiply(learning_rate).add(vl.multiply(-momentum))
+                    for gl, vl in zip(grad, v_prev)]
+                self.update_theta(grad, 1)
+            else: self.update_theta(grad, learning_rate)
+            v_prev = grad
+
+            # forward propagate and print the cost
             if print_progress:
                 outp = self.forward_prop(X, seq_length=seq_length)
-                actual_len = X.shape[1] if seq_length is None else seq_length
                 total_loss = loss(outp, Y)
                 magnitude = sum([gl.magnitude_theta() for gl in grad])
                 print("cost:%f\tgradient:%f" % (total_loss, magnitude))
-        print("Training complete")
+
+        if print_progress:
+            print("Training complete")
