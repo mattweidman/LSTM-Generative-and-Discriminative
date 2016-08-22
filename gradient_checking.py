@@ -13,7 +13,7 @@ def get_n(h):
     return n
 
 def mse(h, y):
-    return 1/(2*num_examples)*np.sum((h-y)**2, axis=0)
+    return 1/(2*num_examples)*np.sum((h-y)**2)
 
 def dmse(h, y):
     return 1/num_examples*(h-y)
@@ -78,7 +78,7 @@ def check_layer():
     y = np.random.randn(num_examples, output_size)
     s_prev = np.random.randn(num_examples, output_size) # test with s_prev
     h_prev = np.random.randn(num_examples, output_size) # and h_prev = 0 too
-    grad = layer.backprop(x, lambda h: dmse(h, y), s_prev, h_prev)
+    grad = layer.backprop(x, y, dmse, s_prev, h_prev)
     n_grad = numerical_gradient(layer, x, y, mse, s_prev, h_prev)
     grad_diff = grad.add(n_grad.multiply(-1))
     print_grad(grad_diff)
@@ -137,38 +137,181 @@ def check_gates():
     grad_diff = grad - n_grad
     print(grad_diff)
 
+def multiply(W, x):
+    return W.dot(x.T)
+
+def back_multiply(W, x):
+    return W.sum(axis=0)
+
+def check_multiply():
+    in_size = 20
+    out_size = 5
+    x = np.random.randn(num_examples, in_size)
+    W = np.random.randn(out_size, in_size)
+    g = multiply(W, x)
+    outp_funct = lambda: multiply(W, x)
+    loss = lambda h_, y_: h_
+    n_grad = numerical_gradient_param(loss, outp_funct, g, x)
+    grad = back_multiply(W, x)
+    grad_diff = grad - n_grad
+    print(grad_diff)
+
 def sigmoid(x):
     return 1/(1+np.exp(-x))
 
-def sigmoid_gate(x, h_prev, Wgx, Wgh, bg):
-    return sigmoid(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
+def phi(x):
+    return np.tanh(x)
 
-def back_sigmoid_gate(x, h_prev, Wgx, Wgh, bg, g):
-    grad_in = g*(1-g)
-    dLdWgx = grad_in.dot(x)
-    dLdWgh = grad_in.dot(h_prev)
-    dLdbg = grad_in.sum(axis=1)[:,np.newaxis]
-    dLdxg = Wgx.T.dot(grad_in)
-    dLdhg = Wgh.T.dot(grad_in)
-    return dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg
+def phi_gate(x, h_prev, Wx, Wh, b):
+    return phi(Wx.dot(x.T) + Wh.dot(h_prev.T) + b)
 
-def check_sigmoid_gate():
+def sigmoid_gate(x, h_prev, Wx, Wh, b):
+    return sigmoid(Wx.dot(x.T) + Wh.dot(h_prev.T) + b)
+
+def back_single_gate(x, h_prev, grad_in, W_x, W_h):
+    dLdW_x = grad_in.dot(x)
+    dLdW_h = grad_in.dot(h_prev)
+    dLdb_ = grad_in.sum(axis=1)[:,np.newaxis]
+    dLdx_ = W_x.T.dot(grad_in)
+    dLdh_ = W_h.T.dot(grad_in)
+    return dLdW_x, dLdW_h, dLdb_, dLdx_.T, dLdh_.T
+
+def check_single_gate():
     in_size = 20
     out_size = 5
     x = np.random.randn(num_examples, in_size)
     h_prev = np.random.randn(num_examples, out_size)
-    Wgx = np.random.randn(out_size, in_size)
-    Wgh = np.random.randn(out_size, out_size)
-    bg = np.random.randn(out_size, 1)
-    g = sigmoid_gate(x, h_prev, Wgx, Wgh, bg)
-    outp_funct = lambda: g
+    Wx = np.random.randn(out_size, in_size)
+    Wh = np.random.randn(out_size, out_size)
+    b = np.random.randn(out_size, 1)
+    g = phi_gate(x, h_prev, Wx, Wh, b)
+    outp_funct = lambda: phi_gate(x, h_prev, Wx, Wh, b)
     loss = lambda h_, y_: h_
-    n_grad = numerical_gradient_param(loss, outp_funct, g, x)
-    grad = back_sigmoid_gate(x, h_prev, Wgx, Wgh, bg, g)[0]
-    print(grad.shape)
-    print(n_grad.shape)
+    n_grad = numerical_gradient_param(loss, outp_funct, g, h_prev)
+    grad_in = 1-g**2
+    grad = back_single_gate(x, h_prev, grad_in, Wx, Wh)[4]
     grad_diff = grad - n_grad
     print(grad_diff)
 
+def forward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo):
+    g = phi(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
+    i = sigmoid(Wix.dot(x.T) + Wih.dot(h_prev.T) + bi)
+    f = sigmoid(Wfx.dot(x.T) + Wfh.dot(h_prev.T) + bf)
+    o = sigmoid(Wox.dot(x.T) + Woh.dot(h_prev.T) + bo)
+    s = g*i + s_prev.T*f
+    h = phi(s)*o
+    return g, i, f, o, s, h
+
+def forward_prop_once(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
+        bf, Wox, Woh, bo, return_gates=False):
+    g = phi(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
+    i = sigmoid(Wix.dot(x.T) + Wih.dot(h_prev.T) + bi)
+    f = sigmoid(Wfx.dot(x.T) + Wfh.dot(h_prev.T) + bf)
+    o = sigmoid(Wox.dot(x.T) + Woh.dot(h_prev.T) + bo)
+    s = g*i + s_prev.T*f
+    h = phi(s)*o
+    if return_gates:
+        return s.T, h.T, (g, i, f, o, s, h)
+    else:
+        return s.T, h.T
+
+def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
+        bf, Wox, Woh, bo, dloss, y, s_next_grad=None, h_next_grad=None,
+        gate_values=None):
+
+    # default values for s_next_grad and h_next_grad
+    if s_next_grad is None:
+        s_next_grad = np.zeros(s_prev.shape)
+    if h_next_grad is None:
+        h_next_grad = np.zeros(h_prev.shape)
+
+    # propagate forward
+    if gate_values is None:
+        _, _, (g, i, f, o, s, h) = forward_prop_once(x, s_prev, h_prev, Wgx,
+            Wgh, bg, Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo, return_gates=True)
+    else:
+        g, i, f, o, s, h = gate_values
+    assert g.shape[0] == h.shape[0]
+    assert i.shape[1] == h.shape[1]
+    assert f.shape[0] == s.shape[0]
+    assert o.shape[1] == s.shape[1]
+
+    # backprop to each gates
+    dLdh = dloss(h.T,y).T + h_next_grad.T
+    dLdo = dLdh * phi(s)
+    dLds = dLdh * o * (1-phi(s)**2) + s_next_grad.T
+    dLdg = dLds * i
+    dLdi = dLds * g
+    dLdf = dLds * s_prev.T
+    dLds_prev = dLds * f
+
+    # finds dL/dW?x, dL/dW?h, dL/db?, dL/dx_?, and dL/dh_?
+    # grad_in is equal to dL/d? * sigmoid_prime or dL/d? * phi_prime
+    # ? indicates the name of a gate - g, i, f, or o
+    def backprop_gate(grad_in, W_x, W_h):
+        dLdW_x = grad_in.dot(x)
+        dLdW_h = grad_in.dot(h_prev)
+        dLdb_ = grad_in.sum(axis=1)[:,np.newaxis]
+        dLdx_ = W_x.T.dot(grad_in)
+        dLdh_ = W_h.T.dot(grad_in)
+        return dLdW_x, dLdW_h, dLdb_, dLdx_, dLdh_
+
+    # backprop within each gate
+    g_prime = dLdg * (1-g**2)
+    dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg = backprop_gate(g_prime, Wgx, Wgh)
+    i_prime = dLdi * i*(1-i)
+    dLdWix, dLdWih, dLdbi, dLdxi, dLdhi = backprop_gate(i_prime, Wix, Wih)
+    f_prime = dLdf * f*(1-f)
+    dLdWfx, dLdWfh, dLdbf, dLdxf, dLdhf = backprop_gate(f_prime, Wfx, Wfh)
+    o_prime = dLdo * o*(1-o)
+    dLdWox, dLdWoh, dLdbo, dLdxo, dLdho = backprop_gate(o_prime, Wox, Woh)
+
+    # combine everything into one data structure
+    dLdtheta = [dLdWgx, dLdWix, dLdWfx, dLdWox, dLdWgh, dLdWih, dLdWfh,
+       dLdWoh, dLdbg, dLdbi, dLdbf, dLdbo]
+    dLdx = dLdxg + dLdxi + dLdxf + dLdxo
+    dLdh_prev = dLdhg + dLdhi + dLdhf + dLdho
+
+    return LSTM_layer_gradient(dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T)
+
+def check_sep_layer():
+    input_size = 20
+    output_size = 5
+    x = np.random.randn(num_examples, input_size)
+    s_prev = np.random.randn(num_examples, output_size)
+    h_prev = np.random.randn(num_examples, output_size)
+    Wgx = np.random.randn(output_size, input_size)
+    Wix = np.random.randn(output_size, input_size)
+    Wfx = np.random.randn(output_size, input_size)
+    Wox = np.random.randn(output_size, input_size)
+    Wgh = np.random.randn(output_size, output_size)
+    Wih = np.random.randn(output_size, output_size)
+    Wfh = np.random.randn(output_size, output_size)
+    Woh = np.random.randn(output_size, output_size)
+    bg = np.random.randn(output_size, 1)
+    bi = np.random.randn(output_size, 1)
+    bf = np.random.randn(output_size, 1)
+    bo = np.random.randn(output_size, 1)
+    y = np.random.randn(num_examples, output_size)
+
+    outp_funct = lambda: forward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg,
+        Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo)[5].T
+    n_grad_theta = []
+    for w in [Wgx, Wix, Wfx, Wox, Wgh, Wih, Wfh, Woh, bg, bi, bf, bo]:
+        n_grad_theta.append(numerical_gradient_param(mse, outp_funct, y, w))
+    n_grad_x = numerical_gradient_param(mse, outp_funct, y, x)
+    n_grad_s_prev = numerical_gradient_param(mse, outp_funct, y, s_prev)
+    n_grad_h_prev = numerical_gradient_param(mse, outp_funct, y, h_prev)
+
+    grad = backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi,
+        Wfx, Wfh, bf, Wox, Woh, bo, dmse, y).to_tuple()
+
+    print("theta gradient:")
+    for wn, wg in zip(n_grad_theta, grad[0]):
+        print(((wn-wg)**2).sum())
+    print("x gradient: ", ((n_grad_x-grad[1])**2).sum())
+    print("s_prev gradient: ", ((n_grad_s_prev-grad[2])**2).sum())
+    print("h_prev gradient: ", ((n_grad_h_prev-grad[3])**2).sum())
+
 if __name__ == "__main__":
-    check_sigmoid_gate()
+    check_sep_layer()
