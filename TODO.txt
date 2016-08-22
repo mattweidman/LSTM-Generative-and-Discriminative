@@ -4,6 +4,7 @@ Make BPTT work properly
 It's possible x_next_grad isn't doing anything?
 Note: Gradient decreases when dLdW_x and dLdb_ are set to 0, but dLdW_h is left on its own
 Try gradient checking!
+Pretty sure the part that is wrong is in the nested function backprop_gate, but more investigation is needed
 
 Adagrad, Adadelta, RMSprop, Conjugate gradient descent?
 

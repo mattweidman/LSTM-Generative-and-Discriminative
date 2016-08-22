@@ -137,5 +137,38 @@ def check_gates():
     grad_diff = grad - n_grad
     print(grad_diff)
 
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
+
+def sigmoid_gate(x, h_prev, Wgx, Wgh, bg):
+    return sigmoid(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
+
+def back_sigmoid_gate(x, h_prev, Wgx, Wgh, bg, g):
+    grad_in = g*(1-g)
+    dLdWgx = grad_in.dot(x)
+    dLdWgh = grad_in.dot(h_prev)
+    dLdbg = grad_in.sum(axis=1)[:,np.newaxis]
+    dLdxg = Wgx.T.dot(grad_in)
+    dLdhg = Wgh.T.dot(grad_in)
+    return dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg
+
+def check_sigmoid_gate():
+    in_size = 20
+    out_size = 5
+    x = np.random.randn(num_examples, in_size)
+    h_prev = np.random.randn(num_examples, out_size)
+    Wgx = np.random.randn(out_size, in_size)
+    Wgh = np.random.randn(out_size, out_size)
+    bg = np.random.randn(out_size, 1)
+    g = sigmoid_gate(x, h_prev, Wgx, Wgh, bg)
+    outp_funct = lambda: g
+    loss = lambda h_, y_: h_
+    n_grad = numerical_gradient_param(loss, outp_funct, g, x)
+    grad = back_sigmoid_gate(x, h_prev, Wgx, Wgh, bg, g)[0]
+    print(grad.shape)
+    print(n_grad.shape)
+    grad_diff = grad - n_grad
+    print(grad_diff)
+
 if __name__ == "__main__":
-    check_layer()
+    check_sigmoid_gate()
