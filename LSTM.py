@@ -174,11 +174,12 @@ class LSTM:
                 x_next_grad = grad[0].dLdx
             gradients.append(grad)
 
-        # sum the gradients
+        # average the gradients
+        actual_length = X.shape[1] if seq_length is None else seq_length
         gradsum = gradients[0]
         for i in range(1, len(gradients)):
             for sum_layer, grad_layer in zip(gradsum, gradients[i]):
-                sum_layer = sum_layer.add(grad_layer)
+                sum_layer = sum_layer.add(grad_layer.multiply(1/actual_length))
         return gradsum
 
     # use the gradient to update parameters in theta
@@ -198,9 +199,10 @@ class LSTM:
     # batch_size: number of examples to select; chooses all examples if None
     # seq_length: length of sequence if feedback; if one2one, leave it as None
     # print_progress: prints cost and gradient each iteration if true
+    # s0, h0: initial internal state and hidden output lists
     def SGD(self, X, Y, loss, dloss, num_epochs, learning_rate,
             momentum=None, batch_size=None, seq_length=None,
-            print_progress=False):
+            print_progress=False, s0=None, h0=None):
 
         num_examples = X.shape[0]
         v_prev = None
@@ -208,7 +210,8 @@ class LSTM:
 
             # compute gradient for entire input
             if batch_size is None:
-                grad = self.BPTT(X, Y, dloss, seq_length=seq_length)
+                grad = self.BPTT(X, Y, dloss, seq_length=seq_length, s0=s0,
+                    h0=h0)
 
             # compute gradient for one batch
             else:
@@ -216,7 +219,8 @@ class LSTM:
                     batch_size)
                 inpt = X[batch_indices]
                 exp_outp = Y[batch_indices]
-                grad = self.BPTT(inpt, exp_outp, dloss, seq_length=seq_length)
+                grad = self.BPTT(inpt, exp_outp, dloss, seq_length=seq_length,
+                    s0=s0, h0=h0)
 
             # update parameters
             if v_prev is not None and momentum is not None:
@@ -230,8 +234,10 @@ class LSTM:
             if print_progress:
                 outp = self.forward_prop(X, seq_length=seq_length)
                 total_loss = loss(outp, Y)
-                magnitude = sum([gl.magnitude_theta() for gl in grad])
-                print("cost:%f\tgradient:%f" % (total_loss, magnitude))
+                mag_grad = sum([gl.magnitude_theta() for gl in grad])
+                mag_theta = sum([l.magnitude_theta() for l in self.layers])
+                print("cost:%f\tgradient:%f\ttheta:%f" % (total_loss, mag_grad,
+                    mag_theta))
 
         if print_progress:
             print("Training complete")

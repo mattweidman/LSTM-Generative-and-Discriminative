@@ -126,6 +126,9 @@ def test_0101():
             ans += vec_to_abc(row)
         return ans
 
+    def string_to_matrix(s):
+        return [abc_to_vec(c) for c in s]
+
     def normalize(v):
         last_axis = len(v.shape)-1
         vmean = np.expand_dims(v.mean(axis=last_axis), axis=last_axis)
@@ -133,9 +136,8 @@ def test_0101():
         return (v-vmean)/vstd
 
     X = normalize(np.array([abc_to_vec('a'), abc_to_vec('b'), abc_to_vec('c')]))
-    Y = np.array([[abc_to_vec('a'), abc_to_vec('b'), abc_to_vec('c')],
-        [abc_to_vec('b'), abc_to_vec('c'), abc_to_vec('a')],
-        [abc_to_vec('c'), abc_to_vec('a'), abc_to_vec('b')]])
+    Y = np.array([string_to_matrix('abc'), string_to_matrix('abc'),
+        string_to_matrix('abc')])
 
     def get_n(tensor):
         n = 1
@@ -151,19 +153,14 @@ def test_0101():
 
     # construct the LSTM
     input_size = len(abc_list)
-    hidden_size1 = 20
-    hidden_size2 = 20
+    hidden_size = 20
     output_size = len(abc_list)
-    layer0 = LSTM_layer(input_size, hidden_size1)
-    layer1 = LSTM_layer(hidden_size1, hidden_size2)
-    layer2 = LSTM_layer(hidden_size2, output_size)
     lstm = LSTM()
-    lstm.add_layer(layer0)
-    lstm.add_layer(layer1)
-    lstm.add_layer(layer2)
+    lstm.add_layer(LSTM_layer(input_size, hidden_size))
+    lstm.add_layer(LSTM_layer(hidden_size, output_size))
 
     # train the LSTM
-    lstm.SGD(X, Y, loss, dloss, 1000, 1, batch_size=100,
+    lstm.SGD(X, Y, loss, dloss, 100000, 1,
         seq_length=Y.shape[1], print_progress=True)
 
     # print the output of the LSTM
