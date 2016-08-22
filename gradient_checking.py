@@ -51,52 +51,22 @@ def numerical_gradient_param(loss, outp, y, param):
             grad_param[i,j] = (loss1-loss2)/(2*epsilon)
     return grad_param
 
-def numerical_gradient(layer, x, loss, s_prev, h_prev):
+def numerical_gradient(layer, x, y, loss, s_prev, h_prev):
+
+    outp_funct = lambda: layer.forward_prop_once(x, s_prev, h_prev)
 
     # gradient with respect to theta
-    grad_theta = [np.zeros(w.shape) for w in layer.theta]
-    for wgt, dwgt in zip(layer.theta, grad_theta):
-        for i in range(len(wgt)):
-            for j in range(len(wgt[i])):
-                wgt[i,j] += epsilon
-                loss1 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-                wgt[i,j] -= 2*epsilon
-                loss2 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-                wgt[i,j] += epsilon
-                dwgt[i,j] = (loss1-loss2)/(2*epsilon)
+    grad_theta = [numerical_gradient_param(mse, outp_funct, y, w)
+        for w in layer.theta]
 
     # gradient with respect to x
-    grad_x = np.zeros(x.shape)
-    for i in range(len(x)):
-        for j in range(len(x[i])):
-            x[i,j] += epsilon
-            loss1 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            x[i,j] -= 2*epsilon
-            loss2 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            x[i,j] += epsilon
-            grad_x[i,j] = (loss1-loss2)/(2*epsilon)
+    grad_x = numerical_gradient_param(mse, outp_funct, y, x)
 
     # gradient with respect to s_prev
-    grad_s_prev = np.zeros(s_prev.shape)
-    for i in range(len(s_prev)):
-        for j in range(len(s_prev[i])):
-            s_prev[i,j] += epsilon
-            loss1 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            s_prev[i,j] -= 2*epsilon
-            loss2 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            s_prev[i,j] += epsilon
-            grad_s_prev[i,j] = (loss1-loss2)/(2*epsilon)
+    grad_s_prev = numerical_gradient_param(mse, outp_funct, y, s_prev)
 
     # gradient with respect to h_prev
-    grad_h_prev = np.zeros(h_prev.shape)
-    for i in range(len(h_prev)):
-        for j in range(len(h_prev[i])):
-            h_prev[i,j] += epsilon
-            loss1 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            h_prev[i,j] -= 2*epsilon
-            loss2 = (layer.forward_prop_once(x, s_prev, h_prev)[1]**2).sum()
-            h_prev[i,j] += epsilon
-            grad_h_prev[i,j] = (loss1-loss2)/(2*epsilon)
+    grad_h_prev = numerical_gradient_param(mse, outp_funct, y, h_prev)
 
     return LSTM_layer_gradient(grad_theta, grad_x, grad_s_prev, grad_h_prev)
 
@@ -109,7 +79,7 @@ def check_layer():
     s_prev = np.random.randn(num_examples, output_size) # test with s_prev
     h_prev = np.random.randn(num_examples, output_size) # and h_prev = 0 too
     grad = layer.backprop(x, lambda h: dmse(h, y), s_prev, h_prev)
-    n_grad = numerical_gradient(layer, x, mse, s_prev, h_prev)
+    n_grad = numerical_gradient(layer, x, y, mse, s_prev, h_prev)
     grad_diff = grad.add(n_grad.multiply(-1))
     print_grad(grad_diff)
 
@@ -123,5 +93,49 @@ def check_mse():
     grad_diff = grad - n_grad
     print(grad_diff)
 
+def check_phi():
+    veclen = 10
+    h = np.random.randn(num_examples, veclen)
+    o = np.random.randn(num_examples, veclen)
+    y = np.random.randn(num_examples, veclen)
+    outp_funct = lambda: h
+    loss = lambda h_, y_: np.tanh(h_)*o
+    dloss = lambda h_, y_: (1-np.tanh(h_)**2)*o
+    n_grad = numerical_gradient_param(loss, outp_funct, y, h)
+    grad = dloss(h,y)
+    grad_diff = grad-n_grad
+    print(grad_diff)
+
+def forward_gates(g, i, f, o, s_prev):
+    s = g*i + s_prev.T*f
+    h = np.tanh(s)*o
+    return h
+
+def backward_gates(g, i, f, o, s_prev, h, y):
+    s = g*i + s_prev.T*f
+    dLdh = 1/num_examples * (h-y)
+    dLdo = dLdh * np.tanh(s)
+    dLds = dLdh * o * (1-np.tanh(s)**2)
+    dLdg = dLds * i
+    dLdi = dLds * g
+    dLdf = dLds * s_prev.T
+    dLds_prev = dLds * f
+    return dLds_prev.T
+
+def check_gates():
+    veclen = 10
+    nrr = lambda: np.random.randn(num_examples, veclen)
+    g = nrr()
+    i = nrr()
+    f = nrr()
+    o = nrr()
+    s_prev = nrr().T
+    y = nrr()
+    outp_funct = lambda: forward_gates(g, i, f, o, s_prev)
+    n_grad = numerical_gradient_param(mse, outp_funct, y, s_prev)
+    grad = backward_gates(g, i, f, o, s_prev, outp_funct(), y)
+    grad_diff = grad - n_grad
+    print(grad_diff)
+
 if __name__ == "__main__":
-    check_mse()
+    check_layer()
