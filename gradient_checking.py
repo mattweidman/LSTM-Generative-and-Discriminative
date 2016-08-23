@@ -194,7 +194,7 @@ def check_single_gate():
     grad_diff = grad - n_grad
     print(grad_diff)
 
-def forward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo):
+def forward_sep_layer(x, s_prev, h_prev, layer):
     g = phi(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
     i = sigmoid(Wix.dot(x.T) + Wih.dot(h_prev.T) + bi)
     f = sigmoid(Wfx.dot(x.T) + Wfh.dot(h_prev.T) + bf)
@@ -203,12 +203,11 @@ def forward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh, b
     h = phi(s)*o
     return g, i, f, o, s, h
 
-def forward_prop_once(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
-        bf, Wox, Woh, bo, return_gates=False):
-    g = phi(Wgx.dot(x.T) + Wgh.dot(h_prev.T) + bg)
-    i = sigmoid(Wix.dot(x.T) + Wih.dot(h_prev.T) + bi)
-    f = sigmoid(Wfx.dot(x.T) + Wfh.dot(h_prev.T) + bf)
-    o = sigmoid(Wox.dot(x.T) + Woh.dot(h_prev.T) + bo)
+def forward_prop_once(x, s_prev, h_prev, layer, return_gates=False):
+    g = phi(layer.Wgx.dot(x.T) + layer.Wgh.dot(h_prev.T) + layer.bg)
+    i = sigmoid(layer.Wix.dot(x.T) + layer.Wih.dot(h_prev.T) + layer.bi)
+    f = sigmoid(layer.Wfx.dot(x.T) + layer.Wfh.dot(h_prev.T) + layer.bf)
+    o = sigmoid(layer.Wox.dot(x.T) + layer.Woh.dot(h_prev.T) + layer.bo)
     s = g*i + s_prev.T*f
     h = phi(s)*o
     if return_gates:
@@ -216,9 +215,8 @@ def forward_prop_once(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
     else:
         return s.T, h.T
 
-def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
-        bf, Wox, Woh, bo, dloss, s_next_grad=None, h_next_grad=None,
-        gate_values=None):
+def backward_sep_layer(x, s_prev, h_prev, layer, dloss, s_next_grad=None,
+        h_next_grad=None, gate_values=None):
 
     # default values for s_next_grad and h_next_grad
     if s_next_grad is None:
@@ -228,8 +226,8 @@ def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
 
     # propagate forward
     if gate_values is None:
-        _, _, (g, i, f, o, s, h) = forward_prop_once(x, s_prev, h_prev, Wgx,
-            Wgh, bg, Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo, return_gates=True)
+        _, _, (g, i, f, o, s, h) = forward_prop_once(x, s_prev, h_prev, layer,
+            return_gates=True)
     else:
         g, i, f, o, s, h = gate_values
     assert g.shape[0] == h.shape[0]
@@ -259,13 +257,17 @@ def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
 
     # backprop within each gate
     g_prime = dLdg * (1-g**2)
-    dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg = backprop_gate(g_prime, Wgx, Wgh)
+    dLdWgx, dLdWgh, dLdbg, dLdxg, dLdhg = backprop_gate(g_prime, layer.Wgx,
+        layer.Wgh)
     i_prime = dLdi * i*(1-i)
-    dLdWix, dLdWih, dLdbi, dLdxi, dLdhi = backprop_gate(i_prime, Wix, Wih)
+    dLdWix, dLdWih, dLdbi, dLdxi, dLdhi = backprop_gate(i_prime, layer.Wix,
+        layer.Wih)
     f_prime = dLdf * f*(1-f)
-    dLdWfx, dLdWfh, dLdbf, dLdxf, dLdhf = backprop_gate(f_prime, Wfx, Wfh)
+    dLdWfx, dLdWfh, dLdbf, dLdxf, dLdhf = backprop_gate(f_prime, layer.Wfx,
+        layer.Wfh)
     o_prime = dLdo * o*(1-o)
-    dLdWox, dLdWoh, dLdbo, dLdxo, dLdho = backprop_gate(o_prime, Wox, Woh)
+    dLdWox, dLdWoh, dLdbo, dLdxo, dLdho = backprop_gate(o_prime, layer.Wox,
+        layer.Woh)
 
     # combine everything into one data structure
     dLdtheta = [dLdWgx, dLdWix, dLdWfx, dLdWox, dLdWgh, dLdWih, dLdWfh,
@@ -276,37 +278,28 @@ def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
     return LSTM_layer_gradient(dLdtheta, dLdx.T, dLds_prev.T, dLdh_prev.T)
 
 def check_sep_layer():
-    input_size = 20
+    input_size = 10
     output_size = 5
     x = np.random.randn(num_examples, input_size)
     s_prev = np.random.randn(num_examples, output_size)
     h_prev = np.random.randn(num_examples, output_size)
-    Wgx = np.random.randn(output_size, input_size)
-    Wix = np.random.randn(output_size, input_size)
-    Wfx = np.random.randn(output_size, input_size)
-    Wox = np.random.randn(output_size, input_size)
-    Wgh = np.random.randn(output_size, output_size)
-    Wih = np.random.randn(output_size, output_size)
-    Wfh = np.random.randn(output_size, output_size)
-    Woh = np.random.randn(output_size, output_size)
-    bg = np.random.randn(output_size, 1)
-    bi = np.random.randn(output_size, 1)
-    bf = np.random.randn(output_size, 1)
-    bo = np.random.randn(output_size, 1)
+    s_next_grad = np.random.randn(num_examples, output_size)
+    h_next_grad = np.random.randn(num_examples, output_size)
     y = np.random.randn(num_examples, output_size)
+    layer = LSTM_layer(input_size, output_size)
 
-    outp_funct = lambda: forward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg,
-        Wix, Wih, bi, Wfx, Wfh, bf, Wox, Woh, bo)[5].T
+    outp_funct = lambda: layer.forward_prop_once(x, s_prev, h_prev)[1]
     n_grad_theta = []
-    for w in [Wgx, Wix, Wfx, Wox, Wgh, Wih, Wfh, Woh, bg, bi, bf, bo]:
+    for w in layer.theta:
         n_grad_theta.append(numerical_gradient_param(mse, outp_funct, y, w))
     n_grad_x = numerical_gradient_param(mse, outp_funct, y, x)
     n_grad_s_prev = numerical_gradient_param(mse, outp_funct, y, s_prev)
     n_grad_h_prev = numerical_gradient_param(mse, outp_funct, y, h_prev)
 
     dloss = lambda h_: dmse(h_, y)
-    grad = backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi,
-        Wfx, Wfh, bf, Wox, Woh, bo, dloss).to_tuple()
+    grad = layer.backprop(x, dloss, s_prev, h_prev,
+        s_next_grad, h_next_grad
+        ).to_tuple()
 
     print("theta gradient:")
     for wn, wg in zip(n_grad_theta, grad[0]):
