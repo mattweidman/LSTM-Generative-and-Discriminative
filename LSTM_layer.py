@@ -63,7 +63,7 @@ class LSTM_layer:
     # the size of the first dimension
     # gate_values is a (g, i, f, o, s, h) tuple, each representing a gate, size
     # (output_size, num_examples)
-    def backprop(self, x, y, dloss, s_prev, h_prev, s_next_grad=None,
+    def backprop(self, x, dloss, s_prev, h_prev, s_next_grad=None,
             h_next_grad=None, gate_values=None):
 
         # default values for s_next_grad and h_next_grad
@@ -84,7 +84,7 @@ class LSTM_layer:
         assert o.shape[1] == s.shape[1]
 
         # backprop to each gates
-        dLdh = dloss(h.T,y).T + h_next_grad.T
+        dLdh = dloss(h.T).T + h_next_grad.T
         dLdo = dLdh * phi(s)
         dLds = dLdh * o * (1-phi(s)**2) + s_next_grad.T
         dLdg = dLds * i

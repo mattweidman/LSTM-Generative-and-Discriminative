@@ -78,7 +78,8 @@ def check_layer():
     y = np.random.randn(num_examples, output_size)
     s_prev = np.random.randn(num_examples, output_size) # test with s_prev
     h_prev = np.random.randn(num_examples, output_size) # and h_prev = 0 too
-    grad = layer.backprop(x, y, dmse, s_prev, h_prev)
+    dloss = lambda h_: dmse(h_, y)
+    grad = layer.backprop(x, dloss, s_prev, h_prev)
     n_grad = numerical_gradient(layer, x, y, mse, s_prev, h_prev)
     grad_diff = grad.add(n_grad.multiply(-1))
     print_grad(grad_diff)
@@ -216,7 +217,7 @@ def forward_prop_once(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
         return s.T, h.T
 
 def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
-        bf, Wox, Woh, bo, dloss, y, s_next_grad=None, h_next_grad=None,
+        bf, Wox, Woh, bo, dloss, s_next_grad=None, h_next_grad=None,
         gate_values=None):
 
     # default values for s_next_grad and h_next_grad
@@ -237,7 +238,7 @@ def backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi, Wfx, Wfh,
     assert o.shape[1] == s.shape[1]
 
     # backprop to each gates
-    dLdh = dloss(h.T,y).T + h_next_grad.T
+    dLdh = dloss(h.T).T + h_next_grad.T
     dLdo = dLdh * phi(s)
     dLds = dLdh * o * (1-phi(s)**2) + s_next_grad.T
     dLdg = dLds * i
@@ -303,8 +304,9 @@ def check_sep_layer():
     n_grad_s_prev = numerical_gradient_param(mse, outp_funct, y, s_prev)
     n_grad_h_prev = numerical_gradient_param(mse, outp_funct, y, h_prev)
 
+    dloss = lambda h_: dmse(h_, y)
     grad = backward_sep_layer(x, s_prev, h_prev, Wgx, Wgh, bg, Wix, Wih, bi,
-        Wfx, Wfh, bf, Wox, Woh, bo, dmse, y).to_tuple()
+        Wfx, Wfh, bf, Wox, Woh, bo, dloss).to_tuple()
 
     print("theta gradient:")
     for wn, wg in zip(n_grad_theta, grad[0]):
