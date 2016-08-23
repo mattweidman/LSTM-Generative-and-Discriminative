@@ -160,7 +160,7 @@ class LSTM:
         # backprop for every element in the sequence
         s_next_grad = sn_grad
         h_next_grad = hn_grad
-        x_next_grad = np.zeros((num_examples, self.layers[0].input_size))
+        x_next_grad = 0#np.zeros((num_examples, self.layers[0].input_size))
         gradients = []
         for i in range(seq_length-1, -1, -1):
             s_prev = s0 if i == 0 else slist[i-1]
@@ -234,10 +234,8 @@ class LSTM:
             if print_progress:
                 outp = self.forward_prop(X, seq_length=seq_length)
                 total_loss = loss(outp, Y)
-                mag_grad = sum([gl.magnitude_theta() for gl in grad])
-                mag_theta = sum([l.magnitude_theta() for l in self.layers])
-                print("cost:%f\tgradient:%f\ttheta:%f" % (total_loss, mag_grad,
-                    mag_theta))
+                magnitude = sum([gl.magnitude_theta() for gl in grad])
+                print("cost:%f\tgradient:%f" % (total_loss, magnitude))
 
         if print_progress:
             print("Training complete")
