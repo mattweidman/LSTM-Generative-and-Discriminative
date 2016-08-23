@@ -2,6 +2,7 @@ import math
 import numpy as np
 
 from LSTM_layer import LSTM_layer, LSTM_layer_gradient
+from LSTM import LSTM
 
 epsilon = 0.00001
 num_examples = 1
@@ -297,9 +298,7 @@ def check_sep_layer():
     n_grad_h_prev = numerical_gradient_param(mse, outp_funct, y, h_prev)
 
     dloss = lambda h_: dmse(h_, y)
-    grad = layer.backprop(x, dloss, s_prev, h_prev,
-        s_next_grad, h_next_grad
-        ).to_tuple()
+    grad = layer.backprop(x, dloss, s_prev, h_prev).to_tuple()
 
     print("theta gradient:")
     for wn, wg in zip(n_grad_theta, grad[0]):
@@ -308,5 +307,43 @@ def check_sep_layer():
     print("s_prev gradient: ", ((n_grad_s_prev-grad[2])**2).sum())
     print("h_prev gradient: ", ((n_grad_h_prev-grad[3])**2).sum())
 
+def check_multiple_layers():
+    input_size = 10
+    hidden_size = 7
+    output_size = 5
+    x = np.random.randn(num_examples, input_size)
+    s_prev = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
+    h_prev = [np.random.randn(num_examples, hidden_size),
+        np.random.randn(num_examples, output_size)]
+    y = np.random.randn(num_examples, output_size)
+    lstm = LSTM()
+    lstm.add_layer(LSTM_layer(input_size, hidden_size))
+    lstm.add_layer(LSTM_layer(hidden_size, output_size))
+
+    outp_funct = lambda: lstm.forward_prop_once(x, s_prev, h_prev)[1][-1]
+    n_grad_theta = []
+    for layer in lstm.layers:
+        n_grad_theta_l = [numerical_gradient_param(mse, outp_funct, y, w)
+            for w in layer.theta]
+        n_grad_theta.append(n_grad_theta_l)
+    n_grad_x = numerical_gradient_param(mse, outp_funct, y, x)
+    n_grad_s_prev0 = numerical_gradient_param(mse, outp_funct, y, s_prev[0])
+    n_grad_s_prev1 = numerical_gradient_param(mse, outp_funct, y, s_prev[1])
+    n_grad_h_prev0 = numerical_gradient_param(mse, outp_funct, y, h_prev[0])
+    n_grad_h_prev1 = numerical_gradient_param(mse, outp_funct, y, h_prev[1])
+
+    grads = lstm.backprop_once(x, y, dmse, s_prev, h_prev)
+
+    print("theta gradient:")
+    for ngt_l, g in zip(n_grad_theta, grads):
+        for nw, w in zip(ngt_l, g.dLdtheta):
+            print(((nw-w)**2).sum())
+    print("x gradient: ", ((n_grad_x-grads[0].dLdx)**2).sum())
+    print("s_prev[0] gradient: ", ((n_grad_s_prev0-grads[0].dLds_prev)**2).sum())
+    print("s_prev[1] gradient: ", ((n_grad_s_prev1-grads[1].dLds_prev)**2).sum())
+    print("h_prev[0] gradient: ", ((n_grad_h_prev0-grads[0].dLdh_prev)**2).sum())
+    print("h_prev[1] gradient: ", ((n_grad_h_prev1-grads[1].dLdh_prev)**2).sum())
+
 if __name__ == "__main__":
-    check_sep_layer()
+    check_multiple_layers()
