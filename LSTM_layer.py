@@ -33,6 +33,10 @@ class LSTM_layer:
             self.Wgh, self.Wih, self.Wfh, self.Woh,
             self.bg, self.bi, self.bf, self.bo]
 
+    # magnitude of weights and biases
+    def magnitude_theta(self):
+        return sum([(w**2).sum() for w in self.theta])
+
     # calculate the state and hidden layer vectors for the next time step
     # x: input matrix, size (num_examples, input_size)
     # s_prev: previous internal state size (num_examples, output_size)
