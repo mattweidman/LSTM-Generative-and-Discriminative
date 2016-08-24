@@ -175,11 +175,10 @@ class LSTM:
             gradients.append(grad)
 
         # average the gradients
-        actual_length = X.shape[1] if seq_length is None else seq_length
-        gradsum = gradients[0]
-        for i in range(1, len(gradients)):
-            for sum_layer, grad_layer in zip(gradsum, gradients[i]):
-                sum_layer = sum_layer.add(grad_layer.multiply(1/actual_length))
+        gradsum = [gl.multiply(0) for gl in gradients[0]]
+        for i in range(0, len(gradients)):
+            for j in range(len(gradsum)):
+                gradsum[j] = gradsum[j].add(gradients[i][j])
         return gradsum
 
     # use the gradient to update parameters in theta
