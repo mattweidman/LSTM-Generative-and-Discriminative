@@ -397,3 +397,4 @@ def check_BPTT_feedback():
 
 if __name__ == "__main__":
     check_BPTT_feedback()
+    check_BPTT_one2one()

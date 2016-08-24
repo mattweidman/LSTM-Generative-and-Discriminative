@@ -9,5 +9,3 @@ Add a softmax layer for the output of the LSTM
 Perform BPTT on LSTM using subsequences of size k
 
 Implement regularization
-
-Make it so you don't forward propagate in both backprop_once() and BPTT()

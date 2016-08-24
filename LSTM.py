@@ -68,18 +68,20 @@ class LSTM:
         # forward prop through sequence
         s, h = s0, h0
         slist, hlist = [], []
+        shgates = []
         if is_feedback:
             x = X
             X = np.zeros((x.shape[0], 0, x.shape[1]))
         for i in range(seq_length):
             if is_feedback: X = np.concatenate((X, x[:,np.newaxis,:]), axis=1)
             else: x = X[:,i,:]
-            s, h = self.forward_prop_once(x, s, h)
+            s, h, gates = self.forward_prop_once(x, s, h, return_gates=True)
             slist.append(s)
             hlist.append(h)
+            shgates.append((s, h, gates))
             if is_feedback: x = h[-1]
 
-        return X, slist, hlist
+        return X, slist, hlist, shgates
 
     # forward propagate input through this LSTM
     # X is a matrix of size (num_examples, input_size) if feedback
@@ -90,7 +92,7 @@ class LSTM:
     # input_size and output_size must therefore be the same if feedback
     # returns an output Y of size (num_examples, seq_length, output_size)
     def forward_prop(self, X, seq_length=None, s0=None, h0=None):
-        X, slist, hlist = self.forward_prop_lists(X, seq_length, s0, h0)
+        X, slist, hlist, shg = self.forward_prop_lists(X, seq_length, s0, h0)
         num_examples = X.shape[0]
         outp = np.zeros((num_examples, 0, self.layers[-1].output_size))
         for h in hlist:
@@ -106,9 +108,10 @@ class LSTM:
     # h_prev is a list of h(t-1) matrices for each layer
     # s_next_grad is a list of s(t+1) gradients for each layer
     # h_next_grad is a list of h(t+1) gradients for each layer
+    # shg is a tuple of (s, h, (g, i, f, o, s.T, h.T))
     # returns a list of LSTM_layer_gradient objects
     def backprop_once(self, x, y, dloss, s_prev, h_prev, s_next_grad=None,
-            h_next_grad=None):
+            h_next_grad=None, shg=None):
 
         # default values for s_prev, h_prev, s_next_grad, and h_next_grad
         num_examples = x.shape[0]
@@ -119,8 +122,11 @@ class LSTM:
         if h_next_grad is None: h_next_grad = nonelist()
 
         # forward propagate
-        s, h, gates = self.forward_prop_once(x, s_prev, h_prev,
-            return_gates=True)
+        if shg is None:
+            s, h, gates = self.forward_prop_once(x, s_prev, h_prev,
+                return_gates=True)
+        else:
+            s, h, gates = shg
 
         # backprop each layer
         gradient = []
@@ -152,8 +158,8 @@ class LSTM:
 
         # forward prop through sequence
         s, h = s0, h0
-        X, slist, hlist = self.forward_prop_lists(X, seq_length=seq_length,
-            s0=s0, h0=h0)
+        X, slist, hlist, shglist = self.forward_prop_lists(X,
+            seq_length=seq_length, s0=s0, h0=h0)
 
         is_feedback = seq_length is not None
         if seq_length is None: seq_length = X.shape[1]
@@ -168,7 +174,7 @@ class LSTM:
             h_prev = h0 if i == 0 else hlist[i-1]
             grad = self.backprop_once(X[:,i,:], Y[:,i,:],
                 lambda h_, y_: dloss(h_, y_) + x_next_grad,
-                s_prev, h_prev, s_next_grad, h_next_grad)
+                s_prev, h_prev, s_next_grad, h_next_grad, shglist[i])
             s_next_grad = [gl.dLds_prev for gl in grad]
             h_next_grad = [gl.dLdh_prev for gl in grad]
             if is_feedback:
