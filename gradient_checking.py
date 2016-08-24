@@ -345,16 +345,13 @@ def check_multiple_layers():
     print("h_prev[0] gradient: ", ((n_grad_h_prev0-grads[0].dLdh_prev)**2).sum())
     print("h_prev[1] gradient: ", ((n_grad_h_prev1-grads[1].dLdh_prev)**2).sum())
 
-def check_BPTT():
+def check_BPTT_one2one():
     input_size = 10
     hidden_size = 7
     output_size = 5
     seq_len = 20
     x = np.random.randn(num_examples, seq_len, input_size)
     y = np.random.randn(num_examples, seq_len, output_size)
-    nz = lambda width: np.zeros((num_examples, width))
-    s_prev = [nz(hidden_size), nz(output_size)]
-    h_prev = [nz(hidden_size), nz(output_size)]
     lstm = LSTM()
     lstm.add_layer(LSTM_layer(input_size, hidden_size))
     lstm.add_layer(LSTM_layer(hidden_size, output_size))
@@ -365,7 +362,6 @@ def check_BPTT():
         n_grad_theta_l = [numerical_gradient_param(mse, outp_funct, y, w)
             for w in layer.theta]
         n_grad_theta.append(n_grad_theta_l)
-    # n_grad_x = numerical_gradient_param(mse, outp_funct, y, x[0])
 
     grads = lstm.BPTT(x, y, dmse)
 
@@ -373,12 +369,31 @@ def check_BPTT():
     for ngt_l, g in zip(n_grad_theta, grads):
         for nw, w in zip(ngt_l, g.dLdtheta):
             print(((nw-w)**2).sum())
-    # print("x gradient: ", ((n_grad_x-grads[0].dLdx)**2).sum())
-    # print("n_grad_x: ", n_grad_x)
-    # print("grads[0].dLdx: ", grads[0].dLdx)
-    # print("n_grad_x.shape: ", n_grad_x.shape)
-    # print("grads[0].dLdx.shape: ", grads[0].dLdx.shape)
-    # print("(n_grad_x-grads[0].dLdx).shape: ", (n_grad_x-grads[0].dLdx).shape)
+
+def check_BPTT_feedback():
+    input_size = 5
+    hidden_size = 7
+    output_size = 5
+    seq_len = 20
+    x = np.random.randn(num_examples, input_size)
+    y = np.random.randn(num_examples, seq_len, output_size)
+    lstm = LSTM()
+    lstm.add_layer(LSTM_layer(input_size, hidden_size))
+    lstm.add_layer(LSTM_layer(hidden_size, output_size))
+
+    outp_funct = lambda: lstm.forward_prop(x, seq_length=seq_len)
+    n_grad_theta = []
+    for layer in lstm.layers:
+        n_grad_theta_l = [numerical_gradient_param(mse, outp_funct, y, w)
+            for w in layer.theta]
+        n_grad_theta.append(n_grad_theta_l)
+
+    grads = lstm.BPTT(x, y, dmse, seq_length=seq_len)
+
+    print("theta gradient:")
+    for ngt_l, g in zip(n_grad_theta, grads):
+        for nw, w in zip(ngt_l, g.dLdtheta):
+            print(((nw-w)**2).sum())
 
 if __name__ == "__main__":
-    check_BPTT()
+    check_BPTT_feedback()
