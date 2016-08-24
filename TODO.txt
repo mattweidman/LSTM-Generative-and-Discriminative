@@ -1,8 +1,6 @@
 TODO
 
-Make BPTT work properly
-
-Adagrad, Adadelta, RMSprop, Conjugate gradient descent?
+Adagrad, Adadelta, Conjugate gradient descent?
 
 Make it so dloss() can be a function of more than just h
 

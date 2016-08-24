@@ -105,7 +105,7 @@ def test_SGD():
     for i in range(inp.shape[0]):
         print("%s\t%s" % (chr(i+97), matrix_to_string(outp[i])))'''
 
-def test_0101():
+def test_abc():
 
     abc_list = ['a', 'b', 'c']
     abc_to_ind = dict((c,i) for i,c in enumerate(abc_list))
@@ -136,8 +136,8 @@ def test_0101():
         return (v-vmean)/vstd
 
     X = normalize(np.array([abc_to_vec('a'), abc_to_vec('b'), abc_to_vec('c')]))
-    Y = np.array([string_to_matrix('abc'), string_to_matrix('abc'),
-        string_to_matrix('abc')])
+    Y = np.array([string_to_matrix('baabc'), string_to_matrix('abbbc'),
+        string_to_matrix('cabac')])
 
     def get_n(tensor):
         n = 1
@@ -160,7 +160,7 @@ def test_0101():
     lstm.add_layer(LSTM_layer(hidden_size, output_size))
 
     # train the LSTM
-    lstm.SGD(X, Y, loss, dloss, 100000, 1,
+    lstm.RMSprop(X, Y, loss, dloss, 500, 1, 0.1,
         seq_length=Y.shape[1], print_progress=True)
 
     # print the output of the LSTM
@@ -169,4 +169,4 @@ def test_0101():
         print("%s\t%s" % (matrix_to_string(y_i), matrix_to_string(out_i)))
 
 if __name__ == "__main__":
-    test_0101()
+    test_abc()

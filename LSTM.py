@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 class LSTM:
@@ -228,6 +229,61 @@ class LSTM:
                 self.update_theta(grad, 1)
             else: self.update_theta(grad, learning_rate)
             v_prev = grad
+
+            # forward propagate and print the cost
+            if print_progress:
+                outp = self.forward_prop(X, seq_length=seq_length)
+                total_loss = loss(outp, Y)
+                magnitude = sum([gl.magnitude_theta() for gl in grad])
+                print("cost:%f\tgradient:%f" % (total_loss, magnitude))
+
+        if print_progress:
+            print("Training complete")
+
+    # train using RMSprop
+    # X: input; size (num_ex, seq_len, inp_size) if one2one,
+    # size (num_ex, inp_size) if feedback
+    # Y: expected output; size (num_ex, seq_len, out_size)
+    # loss: function of h (output) and y (expected output), computes the loss
+    # dloss: derivative of loss, also function of h and y
+    # num_epochs: number of iterations to run
+    # initial_lr: initial gradient multiplier during updates
+    # grad_multiplier: weight multiplied to new gradients that are added to the
+    # running rms average
+    # momentum: multiplier for v(t-1) each epoch
+    # batch_size: number of examples to select; chooses all examples if None
+    # seq_length: length of sequence if feedback; if one2one, leave it as None
+    # print_progress: prints cost and gradient each iteration if true
+    # s0, h0: initial internal state and hidden output lists
+    def RMSprop(self, X, Y, loss, dloss, num_epochs, initial_lr,
+            grad_multiplier, batch_size=None, seq_length=None,
+            print_progress=False, s0=None, h0=None):
+
+        num_examples = X.shape[0]
+        ms = 0
+        for epoch in range(num_epochs):
+
+            # compute gradient for entire input
+            if batch_size is None:
+                grad = self.BPTT(X, Y, dloss, seq_length=seq_length, s0=s0,
+                    h0=h0)
+
+            # compute gradient for one batch
+            else:
+                batch_indices = np.random.choice(np.arange(0,num_examples),
+                    batch_size)
+                inpt = X[batch_indices]
+                exp_outp = Y[batch_indices]
+                grad = self.BPTT(inpt, exp_outp, dloss, seq_length=seq_length,
+                    s0=s0, h0=h0)
+
+            # choose new learning rate
+            magnitude = sum([gl.magnitude_theta() for gl in grad])
+            ms = (1-grad_multiplier) * ms + grad_multiplier * magnitude
+            lr = initial_lr / math.sqrt(ms)
+
+            # update parameters
+            self.update_theta(grad, lr)
 
             # forward propagate and print the cost
             if print_progress:
