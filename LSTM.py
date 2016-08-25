@@ -59,6 +59,8 @@ class LSTM:
             seq_length = X.shape[1]
         else:
             assert len(X.shape) == 2
+        if is_feedback:
+            assert self.layers[0].input_size == self.layers[-1].output_size
 
         # default values
         num_examples = X.shape[0]
@@ -167,7 +169,7 @@ class LSTM:
         # backprop for every element in the sequence
         s_next_grad = sn_grad
         h_next_grad = hn_grad
-        x_next_grad = 0#np.zeros((num_examples, self.layers[0].input_size))
+        x_next_grad = 0
         gradients = []
         for i in range(seq_length-1, -1, -1):
             s_prev = s0 if i == 0 else slist[i-1]

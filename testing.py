@@ -1,6 +1,7 @@
 import numpy as np
 import random
 
+from generator import Generator
 from LSTM_layer import LSTM_layer
 from LSTM import LSTM
 
@@ -168,5 +169,13 @@ def test_abc():
     for out_i, y_i in zip(outp, Y):
         print("%s\t%s" % (matrix_to_string(y_i), matrix_to_string(out_i)))
 
+def test_generator():
+    g = Generator(10, list_of_chars)
+    seq_len = 150
+    num_examples = 10
+    chr_seqs = g.generate(seq_len, num_examples)
+    for seq in chr_seqs:
+        print(seq)
+
 if __name__ == "__main__":
-    test_abc()
+    test_generator()

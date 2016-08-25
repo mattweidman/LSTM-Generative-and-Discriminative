@@ -9,3 +9,5 @@ Add a softmax layer for the output of the LSTM
 Perform BPTT on LSTM using subsequences of size k
 
 Implement regularization
+
+Backprop with only the last output included in the cost
