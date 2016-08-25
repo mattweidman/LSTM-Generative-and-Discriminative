@@ -220,7 +220,7 @@ def test_generator_training():
     genr_hidden_size = 10
     disr_hidden_size = 11
     num_epochs_d = 20
-    num_epochs_g = 10000
+    num_epochs_g = 20
     lr = 1
     alpha = 0.9
     batch_size = 100
@@ -245,7 +245,7 @@ def test_generator_training():
     print("accuracy: ", accuracy)
 
     # train generator
-    genr.train_RMS(genr_input, seq_len, disr, num_epochs_g, lr, alpha,
+    genr.train_RMS(genr_input, seq_len, disr, num_epochs_g, 1, lr, alpha,
         batch_size, print_progress=True)
 
     # evaluate discriminator again

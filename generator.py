@@ -58,8 +58,10 @@ class Generator:
     # seq_len: length of output sequences
     # discr: discriminator object
     # num_epochs: number of epochs to run training
+    # data_index: 0 if discr treats the data from this generator as the first
+    # dataset, 1 if discr treats it as the second dataset
     # initial_lr, grad_multiplier: RMSprop parameters
-    def train_RMS(self, X, seq_len, discr, num_epochs, initial_lr,
+    def train_RMS(self, X, seq_len, discr, num_epochs, data_index, initial_lr,
             grad_multiplier, batch_size, print_progress=True):
 
         num_examples = X.shape[0]
@@ -69,7 +71,7 @@ class Generator:
             # generate input and expected output to discriminator
             gen_output = self.generate_tensor(seq_len, num_examples, X)
             Y_exp = np.zeros((num_examples, seq_len, 2))
-            Y_exp[:,-1,1] = 1
+            Y_exp[:,-1,1-data_index] = 1
 
             # get gradient from discriminator
             discr_grads = discr.lstm.BPTT(gen_output, Y_exp, discr_dloss,
