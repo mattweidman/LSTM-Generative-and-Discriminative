@@ -1,6 +1,7 @@
 import numpy as np
 import random
 
+import dataloader
 from generator import Generator
 from LSTM_layer import LSTM_layer
 from LSTM import LSTM
@@ -177,5 +178,9 @@ def test_generator():
     for seq in chr_seqs:
         print(seq)
 
+def test_dataloader():
+    animal_tensor = dataloader.load_data("animals.txt")
+    print(animal_tensor)
+
 if __name__ == "__main__":
-    test_generator()
+    test_dataloader()
