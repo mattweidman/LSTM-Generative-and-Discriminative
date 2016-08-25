@@ -3,6 +3,7 @@ import random
 
 import dataloader
 from discriminator import Discriminator
+from gan import GAN
 from generator import Generator
 from LSTM_layer import LSTM_layer
 from LSTM import LSTM
@@ -218,7 +219,7 @@ def test_generator_training():
     # parameters
     file_name = "animals.txt"
     genr_hidden_size = 10
-    disr_hidden_size = 11
+    disr_hidden_size = 3
     num_epochs_d = 20
     num_epochs_g = 20
     lr = 1
@@ -253,5 +254,34 @@ def test_generator_training():
     accuracy = disr.accuracy(X_actual, X_generated)
     print("accuracy: ", accuracy)
 
+def test_gan():
+
+    #parameters
+    file_name = "animals.txt"
+    g_hidden_size = 10
+    d_hidden_size = 10
+    n_epochs = 100
+    g_epochs = 20
+    d_epochs = 20
+    g_initial_lr = 10
+    d_initial_lr = 1
+    g_multiplier = 0.9
+    d_multiplier = 0.9
+    g_batch_size = 100
+    d_batch_size = 100
+
+    # data
+    char_list = dataloader.get_char_list(file_name)
+    X_actual = dataloader.load_data(file_name)
+    seq_len = X_actual.shape[1]
+
+    # construct GAN
+    gan = GAN(g_hidden_size, d_hidden_size, char_list)
+
+    # train GAN
+    gan.train(X_actual, seq_len, n_epochs, g_epochs, d_epochs, g_initial_lr,
+        d_initial_lr, g_multiplier, d_multiplier, g_batch_size, d_batch_size,
+        print_progress=True)
+
 if __name__ == "__main__":
-    test_generator_training()
+    test_gan()

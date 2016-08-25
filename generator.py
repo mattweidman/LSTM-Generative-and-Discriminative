@@ -62,7 +62,7 @@ class Generator:
     # dataset, 1 if discr treats it as the second dataset
     # initial_lr, grad_multiplier: RMSprop parameters
     def train_RMS(self, X, seq_len, discr, num_epochs, data_index, initial_lr,
-            grad_multiplier, batch_size, print_progress=True):
+            grad_multiplier, batch_size, print_progress=False):
 
         num_examples = X.shape[0]
         ms=0
