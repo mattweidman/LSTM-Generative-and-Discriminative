@@ -153,8 +153,10 @@ class LSTM:
     # sn_grad and hn_grad are gradients you can inject into the last element
     # of the sequence during backprop
     # dloss is the gradient of the loss function; function of h and y
+    # will return a sum of gradients for each sequence element if return_list
+    # is false; else, will return a list of gradients for each element
     def BPTT(self, X, Y, dloss, seq_length=None, s0=None, h0=None, sn_grad=None,
-            hn_grad=None):
+            hn_grad=None, return_list=False):
 
         num_examples = X.shape[0]
 
@@ -183,7 +185,10 @@ class LSTM:
                 x_next_grad = grad[0].dLdx
             gradients.append(grad)
 
-        # average the gradients
+        if return_list:
+            return gradients[::-1]
+
+        # sum the gradients
         gradsum = [gl.multiply(0) for gl in gradients[0]]
         for i in range(0, len(gradients)):
             for j in range(len(gradsum)):

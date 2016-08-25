@@ -34,13 +34,11 @@ class Discriminator:
     # initial_lr and grad_multiplier are RMSprop parameters
     def train_RMS(self, X1, X2, num_epochs, initial_lr, grad_multiplier,
             batch_size, print_progress=False):
-
         # wrangle input and output data
         X = np.concatenate((X1, X2), axis=0)
         Y = np.zeros((X.shape[0], X.shape[1], 2))
         Y[:X1.shape[0], -1, 0] = 1
         Y[X1.shape[0]:, -1, 1] = 1
-
         # train
         self.lstm.RMSprop(X, Y, loss, dloss, num_epochs, initial_lr,
             grad_multiplier, batch_size, print_progress=print_progress)
@@ -53,3 +51,14 @@ class Discriminator:
         Y = np.zeros((Y_tensor.shape[0]))
         Y[Y_tensor[:,-1,0] < Y_tensor[:,-1,1]] = 1
         return Y
+
+    # finds the accuracy of this discriminator
+    # X1: data only from the first dataset
+    # X2: data only from the second dataset
+    # returns the proportion of correctly classified elements in both sets
+    def accuracy(self, X1, X2):
+        Y1 = self.discriminate(X1)
+        Y2 = self.discriminate(X2)
+        num_correct = (1-Y1).sum() + Y2.sum()
+        total_examples = Y1.shape[0] + Y2.shape[0]
+        return num_correct / total_examples
