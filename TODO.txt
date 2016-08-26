@@ -11,3 +11,5 @@ Perform BPTT on LSTM using subsequences of size k
 Implement regularization
 
 Backprop with only the last output included in the cost
+
+Work out the divide by zero problem in RMSprop

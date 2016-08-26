@@ -262,8 +262,8 @@ def test_gan():
 
     #parameters
     file_name = "animals.txt"
-    g_hidden_size = 50
-    d_hidden_size = 50
+    g_hidden_size = 10
+    d_hidden_size = 10
     n_epochs = 1000
     g_epochs = 20
     d_epochs = 10

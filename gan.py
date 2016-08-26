@@ -59,6 +59,6 @@ class GAN:
             # display generator's output
             if print_progress:
                 gen_text = self.generator.generate(seq_len, num_examples,
-                    genr_input[:3,:])
+                    genr_input)
                 for line in gen_text:
                     print(line)
