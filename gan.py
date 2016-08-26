@@ -34,11 +34,13 @@ class GAN:
                 genr_input)
 
             # train discriminator
-            #self.discriminator.train_RMS(X_actual, genr_output, d_epochs,
-            #    d_initial_lr, d_multiplier, d_batch_size)
+            self.discriminator.train_RMS(X_actual, genr_output, d_epochs,
+                d_initial_lr, d_multiplier, d_batch_size)
 
             # evaluate dicriminator
             if print_progress:
+                genr_output = self.generator.generate_tensor(seq_len,
+                    num_examples, genr_input)
                 accuracy = self.discriminator.accuracy(X_actual, genr_output)
                 print("accuracy before generator training: ", accuracy)
 
@@ -49,12 +51,14 @@ class GAN:
 
             # evaluate discriminator
             if print_progress:
+                genr_output = self.generator.generate_tensor(seq_len,
+                    num_examples, genr_input)
                 accuracy = self.discriminator.accuracy(X_actual, genr_output)
                 print("accuracy after generator training: ", accuracy)
 
-        # display generator's output
-        if print_progress:
-            gen_text = self.generator.generate(seq_len, num_examples,
-                genr_input)
-            for line in gen_text:
-                print(gen_text)
+            # display generator's output
+            if print_progress:
+                gen_text = self.generator.generate(seq_len, num_examples,
+                    genr_input[:3,:])
+                for line in gen_text:
+                    print(line)

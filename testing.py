@@ -210,6 +210,10 @@ def test_discriminator():
     disr.train_RMS(X_actual, X_generated, num_epochs, lr, alpha, batch_size,
         print_progress=True)
 
+    # print discriminator output
+    outp = disr.discriminate(np.concatenate((X_actual, X_generated), axis=0))
+    print(outp)
+
     # evaluate discriminator
     accuracy = disr.accuracy(X_actual, X_generated)
     print("accuracy: ", accuracy)
@@ -258,12 +262,12 @@ def test_gan():
 
     #parameters
     file_name = "animals.txt"
-    g_hidden_size = 10
-    d_hidden_size = 10
-    n_epochs = 100
+    g_hidden_size = 50
+    d_hidden_size = 50
+    n_epochs = 1000
     g_epochs = 20
-    d_epochs = 20
-    g_initial_lr = 10
+    d_epochs = 10
+    g_initial_lr = 1
     d_initial_lr = 1
     g_multiplier = 0.9
     d_multiplier = 0.9
