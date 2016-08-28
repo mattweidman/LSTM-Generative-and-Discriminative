@@ -20,9 +20,12 @@ class GAN:
     # g_initial_lr, g_multiplier: generator RMSprop parameters
     # d_initial_lr, d_multiplier: discriminator RMSprop parameters
     # g_batch_size, d_batch_size: batch sizes for generator and discriminator
+    # num_displayed: if print progress is True, this is how many example words
+    # to display - make this None to display all examples
     def train(self, X_actual, seq_len, n_epochs, g_epochs, d_epochs,
             g_initial_lr, d_initial_lr, g_multiplier, d_multiplier,
-            g_batch_size, d_batch_size, print_progress=False):
+            g_batch_size, d_batch_size, print_progress=False,
+            num_displayed=None):
 
         num_examples = X_actual.shape[0]
         # TODO: make genr_input change every epoch
@@ -60,5 +63,7 @@ class GAN:
             if print_progress:
                 gen_text = self.generator.generate(seq_len, num_examples,
                     genr_input)
+                if num_displayed is not None:
+                    gen_text = gen_text[:num_displayed]
                 for line in gen_text:
                     print(line)

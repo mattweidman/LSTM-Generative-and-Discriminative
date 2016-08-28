@@ -285,7 +285,7 @@ def test_gan():
     # train GAN
     gan.train(X_actual, seq_len, n_epochs, g_epochs, d_epochs, g_initial_lr,
         d_initial_lr, g_multiplier, d_multiplier, g_batch_size, d_batch_size,
-        print_progress=True)
+        print_progress=True, num_displayed=3)
 
 if __name__ == "__main__":
     test_gan()
